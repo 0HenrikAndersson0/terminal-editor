@@ -1,2 +1,3 @@
 Hello World! This is a test file for our terminal editor.
 New row here.,  
+New row....

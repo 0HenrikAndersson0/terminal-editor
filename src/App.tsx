@@ -23,7 +23,8 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	const [files, setFiles] = useState<FileState[]>([]);
 	const [activeFileIndex, setActiveFileIndex] = useState(0);
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
-	
+	const [swapBackspaceDelete, setSwapBackspaceDelete] = useState(false);
+
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
 	const viewHeight = Math.max(1, terminalHeight - 7);
@@ -100,32 +101,40 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 			process.exit();
 		}
 
-		if (key.ctrl && input === 'n') { // Next tab
+		if (key.ctrl && input === 'b') {
+			setSwapBackspaceDelete(s => !s);
+			return;
+		}
+
+		if (key.ctrl && input === 'n') {
 			setActiveFileIndex(prev => (prev + 1) % files.length);
 			return;
 		}
-		if (key.ctrl && input === 'p') { // Prev tab
+		if (key.ctrl && input === 'p') {
 			setActiveFileIndex(prev => (prev - 1 + files.length) % files.length);
 			return;
 		}
 
 		if (!activeFile || activeFile.loading || activeFile.error) return;
 
+		let isBackspace = key.backspace || input === '\x7f' || input === '\b';
+		let isDelete = key.delete && !isBackspace;
+
+		if (swapBackspaceDelete) {
+			const tmp = isBackspace;
+			isBackspace = isDelete;
+			isDelete = tmp;
+		}
+
 		if (key.upArrow) {
 			updateActiveFile(f => {
 				const newY = Math.max(0, f.cursor.y - 1);
-				return {
-					...f,
-					cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) }
-				};
+				return { ...f, cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) } };
 			});
 		} else if (key.downArrow) {
 			updateActiveFile(f => {
 				const newY = Math.min(f.lines.length - 1, f.cursor.y + 1);
-				return {
-					...f,
-					cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) }
-				};
+				return { ...f, cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) } };
 			});
 		} else if (key.leftArrow) {
 			updateActiveFile(f => {
@@ -148,25 +157,44 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				newLines.splice(f.cursor.y + 1, 0, after);
 				return { ...f, lines: newLines, cursor: { y: f.cursor.y + 1, x: 0 }, isDirty: true };
 			});
-		} else if (key.backspace) {
+		} else if (isBackspace) {
 			updateActiveFile(f => {
 				if (f.cursor.x > 0) {
+					const line = f.lines[f.cursor.y];
 					const newLines = [...f.lines];
-					newLines[f.cursor.y] = f.lines[f.cursor.y].slice(0, f.cursor.x - 1) + f.lines[f.cursor.y].slice(f.cursor.x);
+					newLines[f.cursor.y] = line.slice(0, f.cursor.x - 1) + line.slice(f.cursor.x);
 					return { ...f, lines: newLines, cursor: { ...f.cursor, x: f.cursor.x - 1 }, isDirty: true };
 				} else if (f.cursor.y > 0) {
 					const prevLine = f.lines[f.cursor.y - 1];
+					const currentLine = f.lines[f.cursor.y];
 					const newLines = [...f.lines];
-					newLines[f.cursor.y - 1] = prevLine + f.lines[f.cursor.y];
+					newLines[f.cursor.y - 1] = prevLine + currentLine;
 					newLines.splice(f.cursor.y, 1);
 					return { ...f, lines: newLines, cursor: { y: f.cursor.y - 1, x: prevLine.length }, isDirty: true };
 				}
 				return f;
 			});
-		} else if (input && !key.ctrl && !key.meta) {
+		} else if (isDelete) {
 			updateActiveFile(f => {
+				const line = f.lines[f.cursor.y];
+				if (f.cursor.x < line.length) {
+					const newLines = [...f.lines];
+					newLines[f.cursor.y] = line.slice(0, f.cursor.x) + line.slice(f.cursor.x + 1);
+					return { ...f, lines: newLines, isDirty: true };
+				} else if (f.cursor.y < f.lines.length - 1) {
+					const nextLine = f.lines[f.cursor.y + 1];
+					const newLines = [...f.lines];
+					newLines[f.cursor.y] = line + nextLine;
+					newLines.splice(f.cursor.y + 1, 1);
+					return { ...f, lines: newLines, isDirty: true };
+				}
+				return f;
+			});
+		} else if (input && !key.ctrl && !key.meta && input !== '\r' && input !== '\n' && input !== '\x7f' && input !== '\b') {
+			updateActiveFile(f => {
+				const line = f.lines[f.cursor.y];
 				const newLines = [...f.lines];
-				newLines[f.cursor.y] = f.lines[f.cursor.y].slice(0, f.cursor.x) + input + f.lines[f.cursor.y].slice(f.cursor.x);
+				newLines[f.cursor.y] = line.slice(0, f.cursor.x) + input + line.slice(f.cursor.x);
 				return { ...f, lines: newLines, cursor: { ...f.cursor, x: f.cursor.x + input.length }, isDirty: true };
 			});
 		}
@@ -177,7 +205,6 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		}
 	});
 
-	// Dedicated scroll handling
 	useEffect(() => {
 		if (!activeFile) return;
 		if (activeFile.cursor.y < activeFile.scroll) {
@@ -231,7 +258,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		}
 	};
 
-	if (files.length === 0) return <Box padding={1}><Text color="cyan">Initializing Gemini Editor...</Text></Box>;
+	if (files.length === 0) return <Box padding={1}><Text color="cyan">Initializing...</Text></Box>;
 	if (activeFile.error) return <Box padding={1}><Text color="red">Error: {activeFile.error}</Text></Box>;
 
 	const visibleLines = activeFile.lines.slice(activeFile.scroll, activeFile.scroll + viewHeight);
@@ -239,7 +266,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	return (
 		<Box flexDirection="column" height={terminalHeight}>
 			<Box paddingX={1} backgroundColor="cyan">
-				<Text color="black" bold> GEMINI EDITOR </Text>
+				<Text color="black" bold> TEXT EDITOR </Text>
 				<Box flexGrow={1} />
 				<Text color="black"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
 			</Box>
@@ -253,7 +280,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 					</Box>
 				))}
 			</Box>
-			
+
 			<Box flexDirection="column" flexGrow={1} paddingX={1} marginTop={1}>
 				{visibleLines.map((line, index) => {
 					const lineIdx = activeFile.scroll + index;
@@ -269,9 +296,9 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 			</Box>
 
 			<Box paddingX={1} backgroundColor="gray">
-				<Text color="black"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} </Text>
+				<Text color="black"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} │ {activeFile.lang.toUpperCase()} </Text>
 				<Box flexGrow={1} />
-				<Text color="black"> {activeFile.lang.toUpperCase()} │ ^S Save │ ^N/^P Tabs │ ^Q Quit </Text>
+				<Text color="black"> ^B Swap B/D │ ^S Save │ ^Q Quit </Text>
 			</Box>
 		</Box>
 	);
