@@ -1,4 +1,4 @@
-# Gemini Terminal Editor
+# Terminal Editor
 
 A modern, terminal-based text editor built with **Node.js**, **TypeScript**, **Ink**, and **Shiki**. It provides a sleek, React-driven interface with high-quality syntax highlighting and multi-file support.
 
