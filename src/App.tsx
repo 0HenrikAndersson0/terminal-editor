@@ -3,6 +3,12 @@ import { Box, Text, useInput, useStdout } from 'ink';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHighlighter, Highlighter } from 'shiki';
+import clipboard from 'clipboardy';
+
+interface Selection {
+	start: { x: number; y: number };
+	end: { x: number; y: number };
+}
 
 interface FileState {
 	path: string;
@@ -13,6 +19,7 @@ interface FileState {
 	error: string | null;
 	lang: string;
 	isDirty: boolean;
+	selection: Selection | null;
 }
 
 interface AppProps {
@@ -24,7 +31,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	const [activeFileIndex, setActiveFileIndex] = useState(0);
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 	const [swapBackspaceDelete, setSwapBackspaceDelete] = useState(false);
-
+	
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
 	const viewHeight = Math.max(1, terminalHeight - 7);
@@ -64,7 +71,8 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 						loading: false,
 						error: null,
 						lang: getLangFromPath(filePath),
-						isDirty: false
+						isDirty: false,
+						selection: null
 					};
 				} catch (err: any) {
 					return {
@@ -75,7 +83,8 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 						loading: false,
 						error: err.message,
 						lang: 'text',
-						isDirty: false
+						isDirty: false,
+						selection: null
 					};
 				}
 			}));
@@ -117,13 +126,40 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 		if (!activeFile || activeFile.loading || activeFile.error) return;
 
-		let isBackspace = key.backspace || input === '\x7f' || input === '\b';
-		let isDelete = key.delete && !isBackspace;
+		const isMoving = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
+		
+		if (isMoving && key.shift) {
+			updateActiveFile(f => {
+				const start = f.selection ? f.selection.start : { ...f.cursor };
+				const newCursor = { ...f.cursor };
+				
+				if (key.upArrow) {
+					newCursor.y = Math.max(0, f.cursor.y - 1);
+					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
+				} else if (key.downArrow) {
+					newCursor.y = Math.min(f.lines.length - 1, f.cursor.y + 1);
+					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
+				} else if (key.leftArrow) {
+					if (f.cursor.x > 0) newCursor.x = f.cursor.x - 1;
+					else if (f.cursor.y > 0) {
+						newCursor.y = f.cursor.y - 1;
+						newCursor.x = f.lines[newCursor.y].length;
+					}
+				} else if (key.rightArrow) {
+					if (f.cursor.x < f.lines[f.cursor.y].length) newCursor.x = f.cursor.x + 1;
+					else if (f.cursor.y < f.lines.length - 1) {
+						newCursor.y = f.cursor.y + 1;
+						newCursor.x = 0;
+					}
+				}
+				
+				return { ...f, cursor: newCursor, selection: { start, end: newCursor } };
+			});
+			return;
+		}
 
-		if (swapBackspaceDelete) {
-			const tmp = isBackspace;
-			isBackspace = isDelete;
-			isDelete = tmp;
+		if (isMoving && !key.shift) {
+			updateActiveFile(f => ({ ...f, selection: null }));
 		}
 
 		if (key.upArrow) {
@@ -148,6 +184,45 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				if (f.cursor.y < f.lines.length - 1) return { ...f, cursor: { y: f.cursor.y + 1, x: 0 } };
 				return f;
 			});
+		} else if (key.ctrl && input === 'k') { // K for "Kill/Keep" (Copy)
+			if (activeFile.selection) {
+				const { start, end } = activeFile.selection;
+				const realStart = (start.y < end.y || (start.y === end.y && start.x < end.x)) ? start : end;
+				const realEnd = (start.y < end.y || (start.y === end.y && start.x < end.x)) ? end : start;
+				
+				let selectedText = '';
+				if (realStart.y === realEnd.y) {
+					selectedText = activeFile.lines[realStart.y].slice(realStart.x, realEnd.x);
+				} else {
+					selectedText += activeFile.lines[realStart.y].slice(realStart.x) + '\n';
+					for (let i = realStart.y + 1; i < realEnd.y; i++) {
+						selectedText += activeFile.lines[i] + '\n';
+					}
+					selectedText += activeFile.lines[realEnd.y].slice(0, realEnd.x);
+				}
+				clipboard.writeSync(selectedText);
+			}
+			return;
+		} else if (key.ctrl && input === 'u') { // U for "Un-kill" (Paste)
+			const text = clipboard.readSync();
+			if (text) {
+				const pasteLines = text.split(/\r?\n/);
+				updateActiveFile(f => {
+					const newLines = [...f.lines];
+					const before = f.lines[f.cursor.y].slice(0, f.cursor.x);
+					const after = f.lines[f.cursor.y].slice(f.cursor.x);
+					
+					if (pasteLines.length === 1) {
+						newLines[f.cursor.y] = before + pasteLines[0] + after;
+						return { ...f, lines: newLines, cursor: { y: f.cursor.y, x: f.cursor.x + pasteLines[0].length }, isDirty: true };
+					} else {
+						newLines[f.cursor.y] = before + pasteLines[0];
+						newLines.splice(f.cursor.y + 1, 0, ...pasteLines.slice(1, -1), pasteLines[pasteLines.length - 1] + after);
+						return { ...f, lines: newLines, cursor: { y: f.cursor.y + pasteLines.length - 1, x: pasteLines[pasteLines.length - 1].length }, isDirty: true };
+					}
+				});
+			}
+			return;
 		} else if (key.return) {
 			updateActiveFile(f => {
 				const before = f.lines[f.cursor.y].slice(0, f.cursor.x);
@@ -157,46 +232,58 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				newLines.splice(f.cursor.y + 1, 0, after);
 				return { ...f, lines: newLines, cursor: { y: f.cursor.y + 1, x: 0 }, isDirty: true };
 			});
-		} else if (isBackspace) {
-			updateActiveFile(f => {
-				if (f.cursor.x > 0) {
+		} else {
+			const isBackspace = key.backspace || input === '\x7f' || input === '\b';
+			const isDelete = key.delete && !isBackspace;
+			
+			let backspace = isBackspace;
+			let del = isDelete;
+			if (swapBackspaceDelete) {
+				backspace = isDelete;
+				del = isBackspace;
+			}
+			
+			if (backspace) {
+				updateActiveFile(f => {
+					if (f.cursor.x > 0) {
+						const line = f.lines[f.cursor.y];
+						const newLines = [...f.lines];
+						newLines[f.cursor.y] = line.slice(0, f.cursor.x - 1) + line.slice(f.cursor.x);
+						return { ...f, lines: newLines, cursor: { ...f.cursor, x: f.cursor.x - 1 }, isDirty: true };
+					} else if (f.cursor.y > 0) {
+						const prevLine = f.lines[f.cursor.y - 1];
+						const currentLine = f.lines[f.cursor.y];
+						const newLines = [...f.lines];
+						newLines[f.cursor.y - 1] = prevLine + currentLine;
+						newLines.splice(f.cursor.y, 1);
+						return { ...f, lines: newLines, cursor: { y: f.cursor.y - 1, x: prevLine.length }, isDirty: true };
+					}
+					return f;
+				});
+			} else if (del) {
+				updateActiveFile(f => {
+					const line = f.lines[f.cursor.y];
+					if (f.cursor.x < line.length) {
+						const newLines = [...f.lines];
+						newLines[f.cursor.y] = line.slice(0, f.cursor.x) + line.slice(f.cursor.x + 1);
+						return { ...f, lines: newLines, isDirty: true };
+					} else if (f.cursor.y < f.lines.length - 1) {
+						const nextLine = f.lines[f.cursor.y + 1];
+						const newLines = [...f.lines];
+						newLines[f.cursor.y] = line + nextLine;
+						newLines.splice(f.cursor.y + 1, 1);
+						return { ...f, lines: newLines, isDirty: true };
+					}
+					return f;
+				});
+			} else if (input && !key.ctrl && !key.meta && input !== '\r' && input !== '\n' && input !== '\x7f' && input !== '\b') {
+				updateActiveFile(f => {
 					const line = f.lines[f.cursor.y];
 					const newLines = [...f.lines];
-					newLines[f.cursor.y] = line.slice(0, f.cursor.x - 1) + line.slice(f.cursor.x);
-					return { ...f, lines: newLines, cursor: { ...f.cursor, x: f.cursor.x - 1 }, isDirty: true };
-				} else if (f.cursor.y > 0) {
-					const prevLine = f.lines[f.cursor.y - 1];
-					const currentLine = f.lines[f.cursor.y];
-					const newLines = [...f.lines];
-					newLines[f.cursor.y - 1] = prevLine + currentLine;
-					newLines.splice(f.cursor.y, 1);
-					return { ...f, lines: newLines, cursor: { y: f.cursor.y - 1, x: prevLine.length }, isDirty: true };
-				}
-				return f;
-			});
-		} else if (isDelete) {
-			updateActiveFile(f => {
-				const line = f.lines[f.cursor.y];
-				if (f.cursor.x < line.length) {
-					const newLines = [...f.lines];
-					newLines[f.cursor.y] = line.slice(0, f.cursor.x) + line.slice(f.cursor.x + 1);
-					return { ...f, lines: newLines, isDirty: true };
-				} else if (f.cursor.y < f.lines.length - 1) {
-					const nextLine = f.lines[f.cursor.y + 1];
-					const newLines = [...f.lines];
-					newLines[f.cursor.y] = line + nextLine;
-					newLines.splice(f.cursor.y + 1, 1);
-					return { ...f, lines: newLines, isDirty: true };
-				}
-				return f;
-			});
-		} else if (input && !key.ctrl && !key.meta && input !== '\r' && input !== '\n' && input !== '\x7f' && input !== '\b') {
-			updateActiveFile(f => {
-				const line = f.lines[f.cursor.y];
-				const newLines = [...f.lines];
-				newLines[f.cursor.y] = line.slice(0, f.cursor.x) + input + line.slice(f.cursor.x);
-				return { ...f, lines: newLines, cursor: { ...f.cursor, x: f.cursor.x + input.length }, isDirty: true };
-			});
+					newLines[f.cursor.y] = line.slice(0, f.cursor.x) + input + line.slice(f.cursor.x);
+					return { ...f, lines: newLines, cursor: { ...f.cursor, x: f.cursor.x + input.length }, isDirty: true };
+				});
+			}
 		}
 
 		if (key.ctrl && input === 's') {
@@ -214,48 +301,74 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		}
 	}, [activeFile?.cursor.y, viewHeight]);
 
-	const renderHighlightedLine = (line: string, isCursorLine: boolean, activeCursorX: number, activeLang: string) => {
-		if (!highlighter || activeLang === 'text') {
-			return (
-				<Text>
-					{isCursorLine ? (
-						<>
-							{line.slice(0, activeCursorX)}
-							<Text backgroundColor="white" color="black">{line[activeCursorX] || ' '}</Text>
-							{line.slice(activeCursorX + 1)}
-						</>
-					) : line}
-				</Text>
-			);
+	const renderHighlightedLine = (line: string, lineIndex: number) => {
+		const isCursorLine = lineIndex === activeFile.cursor.y;
+		const activeCursorX = activeFile.cursor.x;
+		const selection = activeFile.selection;
+		
+		let realSelection: Selection | null = null;
+		if (selection) {
+			const { start, end } = selection;
+			const isBackward = start.y > end.y || (start.y === end.y && start.x > end.x);
+			realSelection = isBackward ? { start: end, end: start } : selection;
 		}
 
-		try {
-			const tokens = highlighter.codeToTokens(line, { lang: activeLang as any, theme: 'github-dark' }).tokens[0];
-			let offset = 0;
-			return (
-				<Text>
-					{tokens.map((t, i) => {
-						const start = offset;
-						const end = offset + t.content.length;
-						offset = end;
-						if (isCursorLine && activeCursorX >= start && activeCursorX < end) {
-							const rel = activeCursorX - start;
+		const tokens = highlighter && activeFile.lang !== 'text' 
+			? highlighter.codeToTokens(line, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
+			: [{ content: line || ' ', color: undefined }];
+
+		const lineChars: { char: string; color?: string }[] = [];
+		tokens.forEach(t => {
+			t.content.split('').forEach(char => {
+				lineChars.push({ char, color: t.color });
+			});
+		});
+		
+		if (lineChars.length === 0) lineChars.push({ char: ' ' });
+
+		return (
+			<Box key={lineIndex}>
+				<Box width={5}>
+					<Text color="gray">{String(lineIndex + 1).padStart(3)} │ </Text>
+				</Box>
+				<Box>
+					<Text>
+						{lineChars.map((item, x) => {
+							let isSelected = false;
+							if (realSelection) {
+								const { start, end } = realSelection;
+								if (lineIndex > start.y && lineIndex < end.y) isSelected = true;
+								else if (lineIndex === start.y && lineIndex === end.y) isSelected = x >= start.x && x < end.x;
+								else if (lineIndex === start.y) isSelected = x >= start.x;
+								else if (lineIndex === end.y) isSelected = x < end.x;
+							}
+							
+							const isCursor = isCursorLine && x === activeCursorX;
+							
+							let bgColor: string | undefined;
+							let fgColor: string | undefined = item.color;
+							
+							if (isCursor) {
+								bgColor = 'white';
+								fgColor = 'black';
+							} else if (isSelected) {
+								bgColor = 'blue';
+								fgColor = 'white';
+							}
+							
 							return (
-								<Text key={i} color={t.color}>
-									{t.content.slice(0, rel)}
-									<Text backgroundColor="white" color="black">{t.content[rel]}</Text>
-									{t.content.slice(rel + 1)}
+								<Text key={x} backgroundColor={bgColor} color={fgColor}>
+									{item.char}
 								</Text>
 							);
-						}
-						return <Text key={i} color={t.color}>{t.content}</Text>;
-					})}
-					{isCursorLine && activeCursorX === line.length && <Text backgroundColor="white" color="black"> </Text>}
-				</Text>
-			);
-		} catch {
-			return <Text>{line}</Text>;
-		}
+						})}
+						{isCursorLine && activeCursorX === lineChars.length && (
+							<Text backgroundColor="white" color="black"> </Text>
+						)}
+					</Text>
+				</Box>
+			</Box>
+		);
 	};
 
 	if (files.length === 0) return <Box padding={1}><Text color="cyan">Initializing...</Text></Box>;
@@ -265,10 +378,10 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 	return (
 		<Box flexDirection="column" height={terminalHeight}>
-			<Box paddingX={1} backgroundColor="cyan">
-				<Text color="black" bold> TEXT EDITOR </Text>
+			<Box paddingX={1}>
+				<Text backgroundColor="cyan" color="black" bold> GEMINI EDITOR </Text>
 				<Box flexGrow={1} />
-				<Text color="black"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
+				<Text backgroundColor="cyan" color="black"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
 			</Box>
 
 			<Box paddingX={1} marginTop={1} gap={2}>
@@ -280,25 +393,15 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 					</Box>
 				))}
 			</Box>
-
+			
 			<Box flexDirection="column" flexGrow={1} paddingX={1} marginTop={1}>
-				{visibleLines.map((line, index) => {
-					const lineIdx = activeFile.scroll + index;
-					return (
-						<Box key={lineIdx}>
-							<Box width={5}>
-								<Text color="gray">{String(lineIdx + 1).padStart(3)} │ </Text>
-							</Box>
-							{renderHighlightedLine(line, lineIdx === activeFile.cursor.y, activeFile.cursor.x, activeFile.lang)}
-						</Box>
-					);
-				})}
+				{visibleLines.map((line, index) => renderHighlightedLine(line, activeFile.scroll + index))}
 			</Box>
 
-			<Box paddingX={1} backgroundColor="gray">
-				<Text color="black"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} │ {activeFile.lang.toUpperCase()} </Text>
+			<Box paddingX={1}>
+				<Text backgroundColor="gray" color="black"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} │ {activeFile.lang.toUpperCase()} </Text>
 				<Box flexGrow={1} />
-				<Text color="black"> ^B Swap B/D │ ^S Save │ ^Q Quit </Text>
+				<Text backgroundColor="gray" color="black"> Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^S Save │ ^Q Quit </Text>
 			</Box>
 		</Box>
 	);
