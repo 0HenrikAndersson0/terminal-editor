@@ -4,6 +4,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHighlighter, Highlighter } from 'shiki';
 import clipboard from 'clipboardy';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 
 interface Selection {
 	start: { x: number; y: number };
@@ -18,6 +22,11 @@ interface FileNode {
 	level: number;
 }
 
+interface GitChanges {
+	addedLines: Set<number>;
+	deletedLines: Set<number>;
+}
+
 interface FileState {
 	path: string;
 	lines: string[];
@@ -28,6 +37,7 @@ interface FileState {
 	lang: string;
 	isDirty: boolean;
 	selection: Selection | null;
+	gitChanges: GitChanges | null;
 }
 
 interface AppProps {
@@ -43,6 +53,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	const [showExplorer, setShowExplorer] = useState(false);
 	const [explorerNodes, setExplorerNodes] = useState<FileNode[]>([]);
 	const [explorerSelectionIndex, setExplorerSelectionIndex] = useState(0);
+	const [showGitGutter, setShowGitGutter] = useState(false);
 
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
@@ -72,6 +83,53 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 			return [];
 		}
 	};
+
+	const updateGitChanges = useCallback(async (fileIndex: number) => {
+		setFiles(prev => {
+			if (prev.length === 0 || !prev[fileIndex]) return prev;
+			const file = prev[fileIndex];
+			const fullPath = path.resolve(process.cwd(), file.path);
+
+			(async () => {
+				try {
+					const { stdout } = await execAsync(`git diff -U0 "${fullPath}"`, { cwd: path.dirname(fullPath) });
+					const addedLines = new Set<number>();
+					const deletedLines = new Set<number>();
+
+					const hunks = stdout.matchAll(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/g);
+					for (const hunk of hunks) {
+						const oldStart = parseInt(hunk[1], 10);
+						const oldCount = hunk[2] === '' ? 1 : parseInt(hunk[2], 10);
+						const newStart = parseInt(hunk[3], 10);
+						const newCount = hunk[4] === '' ? 1 : parseInt(hunk[4], 10);
+
+						if (newCount > 0) {
+							for (let i = 0; i < newCount; i++) {
+								addedLines.add(newStart + i - 1);
+							}
+						}
+						if (oldCount > 0 && newCount === 0) {
+							// Pure deletion
+							deletedLines.add(newStart);
+						} else if (oldCount > 0) {
+							// Modified (treated as added for now in standard diff)
+						}
+					}
+
+					setFiles(current => {
+						const next = [...current];
+						if (next[fileIndex]) {
+							next[fileIndex] = { ...next[fileIndex], gitChanges: { addedLines, deletedLines } };
+						}
+						return next;
+					});
+				} catch (err) {
+					// Not a git repo or error
+				}
+			})();
+			return prev;
+		});
+	}, []);
 
 	const getLangFromPath = (filePath: string) => {
 		const extension = path.extname(filePath).slice(1) || 'text';
@@ -132,7 +190,8 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 						error: null,
 						lang: getLangFromPath(filePath),
 						isDirty: false,
-						selection: null
+						selection: null,
+						gitChanges: null
 					});
 				} catch (err: any) {
 					// Don't add to initialFiles if it's an error on a directory or unknown
@@ -157,6 +216,12 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	}, [activeFileIndex]);
 
 	useInput((input, key) => {
+		if (key.ctrl && input === 'd') {
+			setShowGitGutter(prev => !prev);
+			if (!showGitGutter) updateGitChanges(activeFileIndex);
+			return;
+		}
+
 		if (key.ctrl && input === 'e') {
 			setShowExplorer(prev => !prev);
 			return;
@@ -239,7 +304,8 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 									error: null,
 									lang: getLangFromPath(node.path),
 									isDirty: false,
-									selection: null
+									selection: null,
+									gitChanges: null
 								};
 								setFiles(prev => {
 									const next = [...prev, newFile];
@@ -476,6 +542,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		if (key.ctrl && input === 's') {
 			fs.writeFile(path.resolve(process.cwd(), activeFile.path), activeFile.lines.join('\n'));
 			updateActiveFile(f => ({ ...f, isDirty: false }));
+			updateGitChanges(activeFileIndex);
 		}
 	});
 
@@ -492,6 +559,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		const isCursorLine = lineIndex === activeFile.cursor.y;
 		const activeCursorX = activeFile.cursor.x;
 		const selection = activeFile.selection;
+		const gitChanges = activeFile.gitChanges;
 
 		let realSelection: Selection | null = null;
 		if (selection) {
@@ -513,10 +581,18 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 		if (lineChars.length === 0) lineChars.push({ char: ' ' });
 
+		let lineNumberColor = isCursorLine ? 'white' : 'gray';
+		if (showGitGutter && gitChanges?.addedLines.has(lineIndex)) {
+			lineNumberColor = 'green';
+		}
+
 		return (
 			<Box key={lineIndex}>
 				<Box width={6}>
-					<Text color={isCursorLine ? 'white' : 'gray'} backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
+					{showGitGutter && gitChanges?.deletedLines.has(lineIndex) && (
+						<Box position="absolute" marginLeft={-1}><Text color="red">^</Text></Box>
+					)}
+					<Text color={lineNumberColor} backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
 				</Box>
 				<Box flexGrow={1}>
 					<Text backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">
@@ -615,7 +691,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 								</Text>
 								<Box flexGrow={1} />
 								<Text backgroundColor="gray" color="black" wrap="truncate">
-									Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^G Goto │ ^E Explorer │ ^N/^P Tabs │ ^S Save │ ^Q Quit
+									Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^G Goto │ ^E Explorer │ ^D Diff │ ^N/^P Tabs │ ^S Save │ ^Q Quit
 								</Text>
 							</>
 						)}

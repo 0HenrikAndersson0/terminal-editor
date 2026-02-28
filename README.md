@@ -6,6 +6,7 @@ A modern terminal text editor built with Ink and Shiki.
 
 - **Syntax Highlighting:** Powered by Shiki with VS Code-grade accuracy.
 - **Project Explorer:** Toggle a sidebar with `Ctrl+E` to navigate folder structures and open files.
+- **Git Gutter:** Toggle with `Ctrl+D` to see added/modified lines (green) and deletions (red markers).
 - **Auto-Indentation:** Automatically matches the indentation of the previous line when pressing Enter.
 - **Current Line Highlighting:** Visually identifies the line your cursor is on.
 - **Indentation-Aware Navigation:** Vertical movement snaps to the indentation level of lines.
@@ -36,6 +37,7 @@ node dist/index.js src/App.tsx src/index.tsx
 - `Shift + Arrows`: Select text
 - `PageUp / PageDown`: Scroll one page
 - `Ctrl + E`: Toggle Project Explorer (Sidebar)
+- `Ctrl + D`: Toggle Git Gutter (Changes)
 - `Ctrl + G`: Go to line
 - `Ctrl + N`: Next file tab
 - `Ctrl + P`: Previous file tab
