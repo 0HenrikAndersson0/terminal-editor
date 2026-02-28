@@ -10,11 +10,7 @@ const handleSignal = () => {
 process.on('SIGINT', handleSignal);
 process.on('SIGTERM', handleSignal);
 
-const filePaths = process.argv.slice(2);
-
-if (filePaths.length === 0) {
-	console.error('Please specify at least one file path to open.');
-	process.exit(1);
-}
+const args = process.argv.slice(2);
+const filePaths = args.length > 0 ? args : ['.'];
 
 render(<App filePaths={filePaths} />);

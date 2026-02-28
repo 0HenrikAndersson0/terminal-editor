@@ -10,6 +10,14 @@ interface Selection {
 	end: { x: number; y: number };
 }
 
+interface FileNode {
+	name: string;
+	path: string;
+	isDirectory: boolean;
+	isOpen: boolean;
+	level: number;
+}
+
 interface FileState {
 	path: string;
 	lines: string[];
@@ -32,10 +40,38 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 	const [swapBackspaceDelete, setSwapBackspaceDelete] = useState(false);
 	const [gotoLineInput, setGotoLineInput] = useState<string | null>(null);
+	const [showExplorer, setShowExplorer] = useState(false);
+	const [explorerNodes, setExplorerNodes] = useState<FileNode[]>([]);
+	const [explorerSelectionIndex, setExplorerSelectionIndex] = useState(0);
 
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
 	const viewHeight = Math.max(1, terminalHeight - 6);
+
+	const loadDirectory = async (dirPath: string, level: number = 0): Promise<FileNode[]> => {
+		try {
+			const entries = await fs.readdir(dirPath, { withFileTypes: true });
+			const nodes: FileNode[] = [];
+			for (const entry of entries) {
+				if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') continue;
+				const fullPath = path.join(dirPath, entry.name);
+				nodes.push({
+					name: entry.name,
+					path: fullPath,
+					isDirectory: entry.isDirectory(),
+					isOpen: false,
+					level
+				});
+			}
+			// Sort: directories first, then files alphabetically
+			return nodes.sort((a, b) => {
+				if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+				return a.name.localeCompare(b.name);
+			});
+		} catch (err) {
+			return [];
+		}
+	};
 
 	const getLangFromPath = (filePath: string) => {
 		const extension = path.extname(filePath).slice(1) || 'text';
@@ -55,17 +91,40 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 			});
 			setHighlighter(hl);
 
-			const initialFiles: FileState[] = await Promise.all(filePaths.map(async (filePath) => {
+			let rootDir = process.cwd();
+			for (const fp of filePaths) {
+				try {
+					const fullPath = path.resolve(process.cwd(), fp);
+					const s = await fs.stat(fullPath);
+					if (s.isDirectory()) {
+						rootDir = fullPath;
+						break;
+					}
+				} catch (e) {}
+			}
+
+			const nodes = await loadDirectory(rootDir);
+			setExplorerNodes(nodes);
+
+			const initialFiles: FileState[] = [];
+			for (const filePath of filePaths) {
 				try {
 					const fullPath = path.resolve(process.cwd(), filePath);
-					let content = '';
+					let stats;
 					try {
-						content = await fs.readFile(fullPath, 'utf8');
+						stats = await fs.stat(fullPath);
 					} catch (e: any) {
 						if (e.code !== 'ENOENT') throw e;
 					}
-					return {
-						path: filePath,
+
+					if (stats && stats.isDirectory()) continue;
+
+					let content = '';
+					if (stats) {
+						content = await fs.readFile(fullPath, 'utf8');
+					}
+					initialFiles.push({
+						path: filePath === '.' ? 'untitled' : filePath,
 						lines: content.split('\n'),
 						cursor: { x: 0, y: 0 },
 						scroll: 0,
@@ -74,22 +133,13 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 						lang: getLangFromPath(filePath),
 						isDirty: false,
 						selection: null
-					};
+					});
 				} catch (err: any) {
-					return {
-						path: filePath,
-						lines: [''],
-						cursor: { x: 0, y: 0 },
-						scroll: 0,
-						loading: false,
-						error: err.message,
-						lang: 'text',
-						isDirty: false,
-						selection: null
-					};
+					// Don't add to initialFiles if it's an error on a directory or unknown
 				}
-			}));
+			}
 			setFiles(initialFiles);
+			if (initialFiles.length > 0) setActiveFileIndex(0);
 		};
 
 		setup();
@@ -107,6 +157,11 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	}, [activeFileIndex]);
 
 	useInput((input, key) => {
+		if (key.ctrl && input === 'e') {
+			setShowExplorer(prev => !prev);
+			return;
+		}
+
 		if (key.ctrl && input === 'g') {
 			setGotoLineInput(prev => prev === null ? '' : null);
 			return;
@@ -128,6 +183,76 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				setGotoLineInput(prev => prev!.slice(0, -1));
 			} else if (/^\d$/.test(input)) {
 				setGotoLineInput(prev => prev + input);
+			}
+			return;
+		}
+
+		if (showExplorer) {
+			if (key.upArrow) {
+				setExplorerSelectionIndex(prev => Math.max(0, prev - 1));
+			} else if (key.downArrow) {
+				setExplorerSelectionIndex(prev => Math.min(explorerNodes.length - 1, prev + 1));
+			} else if (key.return || key.rightArrow || key.leftArrow) {
+				const node = explorerNodes[explorerSelectionIndex];
+				if (node.isDirectory) {
+					if ((key.return || key.rightArrow) && !node.isOpen) {
+						// Expand
+						(async () => {
+							const children = await loadDirectory(node.path, node.level + 1);
+							setExplorerNodes(prev => {
+								const next = [...prev];
+								next[explorerSelectionIndex] = { ...node, isOpen: true };
+								next.splice(explorerSelectionIndex + 1, 0, ...children);
+								return next;
+							});
+						})();
+					} else if ((key.return || key.leftArrow) && node.isOpen) {
+						// Collapse
+						setExplorerNodes(prev => {
+							const next = [...prev];
+							next[explorerSelectionIndex] = { ...node, isOpen: false };
+							let removeCount = 0;
+							for (let i = explorerSelectionIndex + 1; i < next.length; i++) {
+								if (next[i].level > node.level) removeCount++;
+								else break;
+							}
+							next.splice(explorerSelectionIndex + 1, removeCount);
+							return next;
+						});
+					}
+				} else if (key.return) {
+					// Open File
+					(async () => {
+						if (node.isDirectory) return; // Guard against directory opening
+						const existingIndex = files.findIndex(f => f.path === node.path);
+						if (existingIndex !== -1) {
+							setActiveFileIndex(existingIndex);
+						} else {
+							try {
+								const content = await fs.readFile(node.path, 'utf8');
+								const newFile: FileState = {
+									path: node.path,
+									lines: content.split('\n'),
+									cursor: { x: 0, y: 0 },
+									scroll: 0,
+									loading: false,
+									error: null,
+									lang: getLangFromPath(node.path),
+									isDirty: false,
+									selection: null
+								};
+								setFiles(prev => {
+									const next = [...prev, newFile];
+									setActiveFileIndex(next.length - 1);
+									return next;
+								});
+							} catch (err) {
+								// Handle error?
+							}
+						}
+						setShowExplorer(false);
+					})();
+				}
 			}
 			return;
 		}
@@ -433,43 +558,69 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		);
 	};
 
-	if (files.length === 0) return <Box padding={1}><Text color="cyan">Initializing...</Text></Box>;
-	if (activeFile.error) return <Box padding={1}><Text color="red">Error: {activeFile.error}</Text></Box>;
+	if (!highlighter) return <Box padding={1}><Text color="cyan">Initializing highlighter...</Text></Box>;
+	if (activeFile?.error) return <Box padding={1}><Text color="red">Error: {activeFile.error}</Text></Box>;
 
-	const visibleLines = activeFile.lines.slice(activeFile.scroll, activeFile.scroll + viewHeight);
+	const visibleLines = activeFile ? activeFile.lines.slice(activeFile.scroll, activeFile.scroll + viewHeight) : [];
 
 	return (
 		<Box flexDirection="column" height={terminalHeight}>
 			<Box paddingX={1} flexShrink={0} height={1}>
 				<Text backgroundColor="cyan" color="black" bold> CLI EDITOR </Text>
 				<Box flexGrow={1} />
-				<Text backgroundColor="cyan" color="black" wrap="truncate"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
+				<Text backgroundColor="cyan" color="black" wrap="truncate"> {activeFile?.path || 'No file'}{activeFile?.isDirty ? '*' : ''} </Text>
 			</Box>
 
-			<Box paddingX={1} flexShrink={0} height={3}>
-				{files.map((f, i) => (
-					<Box key={i} borderStyle="single" borderColor={i === activeFileIndex ? 'cyan' : 'gray'} paddingX={1}>
-						<Text bold={i === activeFileIndex} color={i === activeFileIndex ? 'cyan' : 'gray'} wrap="truncate">
-							{i + 1}: {path.basename(f.path)}{f.isDirty ? '*' : ''}
-						</Text>
+			<Box flexGrow={1} flexDirection="row">
+				{showExplorer && (
+					<Box width={30} flexDirection="column" borderStyle="single" borderColor="gray" flexShrink={0}>
+						{explorerNodes.slice(0, terminalHeight - 5).map((node, i) => (
+							<Box key={i} paddingX={1}>
+								<Text wrap="truncate" color={i === explorerSelectionIndex ? 'white' : undefined} backgroundColor={i === explorerSelectionIndex ? 'blue' : undefined}>
+									{'  '.repeat(node.level)}
+									{node.isDirectory ? (node.isOpen ? '▾ ' : '▸ ') : '  '}
+									{node.name}
+								</Text>
+							</Box>
+						))}
 					</Box>
-				))}
-			</Box>
-
-			<Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1}>
-				{visibleLines.map((line, index) => renderHighlightedLine(line, activeFile.scroll + index))}
-			</Box>
-
-			<Box paddingX={1} flexShrink={0} height={1}>
-				{gotoLineInput !== null ? (
-					<Text backgroundColor="blue" color="white"> Go to line: {gotoLineInput}_ </Text>
-				) : (
-					<>
-						<Text backgroundColor="gray" color="black" wrap="truncate"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} │ {activeFile.lang.toUpperCase()} </Text>
-						<Box flexGrow={1} />
-						<Text backgroundColor="gray" color="black" wrap="truncate"> Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^G Goto │ ^S Save │ ^Q Quit </Text>
-					</>
 				)}
+
+				<Box flexDirection="column" flexGrow={1}>
+					<Box paddingX={1} flexShrink={0} height={3}>
+						{files.map((f, i) => (
+							<Box key={i} borderStyle="single" borderColor={i === activeFileIndex ? 'cyan' : 'gray'} paddingX={1}>
+								<Text bold={i === activeFileIndex} color={i === activeFileIndex ? 'cyan' : 'gray'} wrap="truncate">
+									{i + 1}: {path.basename(f.path)}{f.isDirty ? '*' : ''}
+								</Text>
+							</Box>
+						))}
+					</Box>
+
+					<Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1}>
+						{activeFile ? visibleLines.map((line, index) => renderHighlightedLine(line, activeFile.scroll + index)) : (
+							<Box flexGrow={1} alignItems="center" justifyContent="center">
+								<Text color="gray">Press ^E to open explorer</Text>
+							</Box>
+						)}
+					</Box>
+
+					<Box paddingX={1} flexShrink={0} height={1}>
+						{gotoLineInput !== null ? (
+							<Text backgroundColor="blue" color="white"> Go to line: {gotoLineInput}_ </Text>
+						) : (
+							<>
+								<Text backgroundColor="gray" color="black" wrap="truncate">
+									{activeFile ? `Ln ${activeFile.cursor.y + 1}, Col ${activeFile.cursor.x + 1} │ ${activeFile.lang.toUpperCase()}` : 'No active file'}
+								</Text>
+								<Box flexGrow={1} />
+								<Text backgroundColor="gray" color="black" wrap="truncate">
+									Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^G Goto │ ^E Explorer │ ^N/^P Tabs │ ^S Save │ ^Q Quit
+								</Text>
+							</>
+						)}
+					</Box>
+				</Box>
 			</Box>
 		</Box>
 	);
