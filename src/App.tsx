@@ -31,7 +31,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	const [activeFileIndex, setActiveFileIndex] = useState(0);
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 	const [swapBackspaceDelete, setSwapBackspaceDelete] = useState(false);
-	
+
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
 	const viewHeight = Math.max(1, terminalHeight - 7);
@@ -127,12 +127,12 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		if (!activeFile || activeFile.loading || activeFile.error) return;
 
 		const isMoving = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
-		
+
 		if (isMoving && key.shift) {
 			updateActiveFile(f => {
 				const start = f.selection ? f.selection.start : { ...f.cursor };
 				const newCursor = { ...f.cursor };
-				
+
 				if (key.upArrow) {
 					newCursor.y = Math.max(0, f.cursor.y - 1);
 					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
@@ -152,7 +152,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 						newCursor.x = 0;
 					}
 				}
-				
+
 				return { ...f, cursor: newCursor, selection: { start, end: newCursor } };
 			});
 			return;
@@ -189,7 +189,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				const { start, end } = activeFile.selection;
 				const realStart = (start.y < end.y || (start.y === end.y && start.x < end.x)) ? start : end;
 				const realEnd = (start.y < end.y || (start.y === end.y && start.x < end.x)) ? end : start;
-				
+
 				let selectedText = '';
 				if (realStart.y === realEnd.y) {
 					selectedText = activeFile.lines[realStart.y].slice(realStart.x, realEnd.x);
@@ -211,7 +211,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 					const newLines = [...f.lines];
 					const before = f.lines[f.cursor.y].slice(0, f.cursor.x);
 					const after = f.lines[f.cursor.y].slice(f.cursor.x);
-					
+
 					if (pasteLines.length === 1) {
 						newLines[f.cursor.y] = before + pasteLines[0] + after;
 						return { ...f, lines: newLines, cursor: { y: f.cursor.y, x: f.cursor.x + pasteLines[0].length }, isDirty: true };
@@ -235,14 +235,14 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		} else {
 			const isBackspace = key.backspace || input === '\x7f' || input === '\b';
 			const isDelete = key.delete && !isBackspace;
-			
+
 			let backspace = isBackspace;
 			let del = isDelete;
 			if (swapBackspaceDelete) {
 				backspace = isDelete;
 				del = isBackspace;
 			}
-			
+
 			if (backspace) {
 				updateActiveFile(f => {
 					if (f.cursor.x > 0) {
@@ -305,7 +305,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		const isCursorLine = lineIndex === activeFile.cursor.y;
 		const activeCursorX = activeFile.cursor.x;
 		const selection = activeFile.selection;
-		
+
 		let realSelection: Selection | null = null;
 		if (selection) {
 			const { start, end } = selection;
@@ -313,7 +313,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 			realSelection = isBackward ? { start: end, end: start } : selection;
 		}
 
-		const tokens = highlighter && activeFile.lang !== 'text' 
+		const tokens = highlighter && activeFile.lang !== 'text'
 			? highlighter.codeToTokens(line, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
 			: [{ content: line || ' ', color: undefined }];
 
@@ -323,7 +323,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				lineChars.push({ char, color: t.color });
 			});
 		});
-		
+
 		if (lineChars.length === 0) lineChars.push({ char: ' ' });
 
 		return (
@@ -342,12 +342,12 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 								else if (lineIndex === start.y) isSelected = x >= start.x;
 								else if (lineIndex === end.y) isSelected = x < end.x;
 							}
-							
+
 							const isCursor = isCursorLine && x === activeCursorX;
-							
+
 							let bgColor: string | undefined;
 							let fgColor: string | undefined = item.color;
-							
+
 							if (isCursor) {
 								bgColor = 'white';
 								fgColor = 'black';
@@ -355,7 +355,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 								bgColor = 'blue';
 								fgColor = 'white';
 							}
-							
+
 							return (
 								<Text key={x} backgroundColor={bgColor} color={fgColor}>
 									{item.char}
@@ -379,7 +379,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	return (
 		<Box flexDirection="column" height={terminalHeight}>
 			<Box paddingX={1}>
-				<Text backgroundColor="cyan" color="black" bold> GEMINI EDITOR </Text>
+				<Text backgroundColor="cyan" color="black" bold> CLI EDITOR </Text>
 				<Box flexGrow={1} />
 				<Text backgroundColor="cyan" color="black"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
 			</Box>
@@ -393,7 +393,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 					</Box>
 				))}
 			</Box>
-			
+
 			<Box flexDirection="column" flexGrow={1} paddingX={1} marginTop={1}>
 				{visibleLines.map((line, index) => renderHighlightedLine(line, activeFile.scroll + index))}
 			</Box>
