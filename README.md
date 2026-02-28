@@ -1,67 +1,37 @@
-# CLI Terminal Editor
+# Terminal Editor
 
-A modern, terminal-based text editor built with **Node.js**, **TypeScript**, **Ink**, and **Shiki**. It provides a sleek, React-driven interface with high-quality syntax highlighting, multi-file support, and clipboard integration.
+A modern terminal text editor built with Ink and Shiki.
 
 ## Features
 
-- 🎨 **Syntax Highlighting**: Powered by [Shiki](https://shiki.matsu.io/) using VS Code themes.
-- 📂 **Multi-file Tabs**: Open and edit multiple files simultaneously.
-- 📋 **Clipboard Integration**: Support for system-wide copy and paste.
-- 🖍️ **Text Selection**: Use Shift + Arrows to mark text.
-- ⌨️ **Intuitive Navigation**: Standard arrow key navigation and basic line editing.
-- 🚀 **Modern TUI**: Built with [Ink](https://github.com/vadimdemedes/ink) for a polished, reactive terminal interface.
-- 📜 **Auto-scrolling**: Smooth viewport management for large files.
-- 💾 **Safe Saving**: Quick shortcuts to save changes to disk.
+- **Syntax Highlighting:** Powered by Shiki with VS Code-grade accuracy.
+- **Auto-Indentation:** Automatically matches the indentation of the previous line when pressing Enter.
+- **Current Line Highlighting:** Visually identifies the line your cursor is on.
+- **Indentation-Aware Navigation:** Vertical movement snaps to the indentation level of lines.
+- **Fast Navigation:** Support for PageUp and PageDown.
+- **Go to Line:** Press `Ctrl+G` to jump to a specific line number.
+- **Multi-file Support:** Open multiple files and switch between them with `Ctrl+N` and `Ctrl+P`.
+- **Clipboard Support:** Integrated copy (`Ctrl+K`) and paste (`Ctrl+U`).
+- **Layout Stability:** UI remains intact even with long paths or large files.
 
-## Installation
+## Shortcuts
 
-1.  Navigate to the project directory:
-    ```bash
-    cd /Users/henrikandersson/Developer/terminal-editor
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Build the project:
-    ```bash
-    npm run build
-    ```
+- `Arrows`: Move cursor
+- `Shift + Arrows`: Select text
+- `PageUp / PageDown`: Scroll one page
+- `Ctrl + G`: Go to line
+- `Ctrl + K`: Copy selection
+- `Ctrl + U`: Paste
+- `Ctrl + S`: Save file
+- `Ctrl + N`: Next file
+- `Ctrl + P`: Previous file
+- `Ctrl + B`: Swap Backspace/Delete behavior
+- `Ctrl + Q` or `Esc`: Quit
 
-## Usage
-
-To start the editor, provide one or more file paths as arguments:
+## Development
 
 ```bash
-npm start <file1> <file2> <file3>
+npm install
+npm run build
+npm start -- file1.txt file2.ts
 ```
-
-Example:
-```bash
-npm start src/App.tsx package.json README.md
-```
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-| :--- | :--- |
-| `Arrows` | Move cursor |
-| `Shift + Arrows` | **Mark / Select text** |
-| `Ctrl + K` | **Copy selection to clipboard** |
-| `Ctrl + U` | **Paste from clipboard** |
-| `Enter` | New line |
-| `Backspace` | Delete character before cursor |
-| `Ctrl + B` | **Swap Backspace/Delete behavior** (macOS fix) |
-| `Ctrl + N` | Switch to next tab |
-| `Ctrl + P` | Switch to previous tab |
-| `Ctrl + S` | Save current file |
-| `Ctrl + Q` / `Esc` | Quit the editor |
-
-## Technologies
-
-- **Language**: TypeScript
-- **Runtime**: Node.js
-- **TUI Framework**: [Ink](https://github.com/vadimdemedes/ink)
-- **Syntax Highlighting**: [Shiki](https://shiki.matsu.io/)
-- **Clipboard**: [Clipboardy](https://github.com/sindresorhus/clipboardy)
-- **Colors**: [Chalk](https://github.com/chalk/chalk)

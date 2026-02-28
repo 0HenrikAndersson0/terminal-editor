@@ -31,10 +31,11 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	const [activeFileIndex, setActiveFileIndex] = useState(0);
 	const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 	const [swapBackspaceDelete, setSwapBackspaceDelete] = useState(false);
+	const [gotoLineInput, setGotoLineInput] = useState<string | null>(null);
 
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
-	const viewHeight = Math.max(1, terminalHeight - 7);
+	const viewHeight = Math.max(1, terminalHeight - 6);
 
 	const getLangFromPath = (filePath: string) => {
 		const extension = path.extname(filePath).slice(1) || 'text';
@@ -106,6 +107,31 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 	}, [activeFileIndex]);
 
 	useInput((input, key) => {
+		if (key.ctrl && input === 'g') {
+			setGotoLineInput(prev => prev === null ? '' : null);
+			return;
+		}
+
+		if (gotoLineInput !== null) {
+			if (key.escape) {
+				setGotoLineInput(null);
+			} else if (key.return) {
+				const lineNum = parseInt(gotoLineInput, 10);
+				if (!isNaN(lineNum)) {
+					updateActiveFile(f => {
+						const targetY = Math.max(0, Math.min(f.lines.length - 1, lineNum - 1));
+						return { ...f, cursor: { y: targetY, x: Math.min(f.cursor.x, f.lines[targetY].length) } };
+					});
+				}
+				setGotoLineInput(null);
+			} else if (key.backspace || input === '\x7f' || input === '\b') {
+				setGotoLineInput(prev => prev!.slice(0, -1));
+			} else if (/^\d$/.test(input)) {
+				setGotoLineInput(prev => prev + input);
+			}
+			return;
+		}
+
 		if (key.escape || (key.ctrl && input === 'q')) {
 			process.exit();
 		}
@@ -126,7 +152,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 		if (!activeFile || activeFile.loading || activeFile.error) return;
 
-		const isMoving = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
+		const isMoving = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow || key.pageUp || key.pageDown;
 
 		if (isMoving && key.shift) {
 			updateActiveFile(f => {
@@ -134,10 +160,22 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 				const newCursor = { ...f.cursor };
 
 				if (key.upArrow) {
-					newCursor.y = Math.max(0, f.cursor.y - 1);
-					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
+					const newY = Math.max(0, f.cursor.y - 1);
+					const currentIndent = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
+					const targetIndent = f.lines[newY].match(/^\s*/)?.[0].length || 0;
+					newCursor.y = newY;
+					newCursor.x = f.cursor.x === currentIndent ? targetIndent : Math.min(f.cursor.x, f.lines[newY].length);
 				} else if (key.downArrow) {
-					newCursor.y = Math.min(f.lines.length - 1, f.cursor.y + 1);
+					const newY = Math.min(f.lines.length - 1, f.cursor.y + 1);
+					const currentIndent = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
+					const targetIndent = f.lines[newY].match(/^\s*/)?.[0].length || 0;
+					newCursor.y = newY;
+					newCursor.x = f.cursor.x === currentIndent ? targetIndent : Math.min(f.cursor.x, f.lines[newY].length);
+				} else if (key.pageUp) {
+					newCursor.y = Math.max(0, f.cursor.y - viewHeight);
+					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
+				} else if (key.pageDown) {
+					newCursor.y = Math.min(f.lines.length - 1, f.cursor.y + viewHeight);
 					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
 				} else if (key.leftArrow) {
 					if (f.cursor.x > 0) newCursor.x = f.cursor.x - 1;
@@ -165,12 +203,34 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 		if (key.upArrow) {
 			updateActiveFile(f => {
 				const newY = Math.max(0, f.cursor.y - 1);
-				return { ...f, cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) } };
+				const currentIndent = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
+				const targetIndent = f.lines[newY].match(/^\s*/)?.[0].length || 0;
+				return { ...f, cursor: { y: newY, x: f.cursor.x === currentIndent ? targetIndent : Math.min(f.cursor.x, f.lines[newY].length) } };
 			});
 		} else if (key.downArrow) {
 			updateActiveFile(f => {
 				const newY = Math.min(f.lines.length - 1, f.cursor.y + 1);
-				return { ...f, cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) } };
+				const currentIndent = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
+				const targetIndent = f.lines[newY].match(/^\s*/)?.[0].length || 0;
+				return { ...f, cursor: { y: newY, x: f.cursor.x === currentIndent ? targetIndent : Math.min(f.cursor.x, f.lines[newY].length) } };
+			});
+		} else if (key.pageUp) {
+			updateActiveFile(f => {
+				const newY = Math.max(0, f.cursor.y - viewHeight);
+				return {
+					...f,
+					cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) },
+					scroll: Math.max(0, f.scroll - viewHeight)
+				};
+			});
+		} else if (key.pageDown) {
+			updateActiveFile(f => {
+				const newY = Math.min(f.lines.length - 1, f.cursor.y + viewHeight);
+				return {
+					...f,
+					cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) },
+					scroll: Math.min(Math.max(0, f.lines.length - viewHeight), f.scroll + viewHeight)
+				};
 			});
 		} else if (key.leftArrow) {
 			updateActiveFile(f => {
@@ -225,12 +285,14 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 			return;
 		} else if (key.return) {
 			updateActiveFile(f => {
-				const before = f.lines[f.cursor.y].slice(0, f.cursor.x);
-				const after = f.lines[f.cursor.y].slice(f.cursor.x);
+				const currentLine = f.lines[f.cursor.y];
+				const indent = currentLine.match(/^\s*/)?.[0] || '';
+				const before = currentLine.slice(0, f.cursor.x);
+				const after = currentLine.slice(f.cursor.x);
 				const newLines = [...f.lines];
 				newLines[f.cursor.y] = before;
-				newLines.splice(f.cursor.y + 1, 0, after);
-				return { ...f, lines: newLines, cursor: { y: f.cursor.y + 1, x: 0 }, isDirty: true };
+				newLines.splice(f.cursor.y + 1, 0, indent + after);
+				return { ...f, lines: newLines, cursor: { y: f.cursor.y + 1, x: indent.length }, isDirty: true };
 			});
 		} else {
 			const isBackspace = key.backspace || input === '\x7f' || input === '\b';
@@ -328,11 +390,11 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 		return (
 			<Box key={lineIndex}>
-				<Box width={5}>
-					<Text color="gray">{String(lineIndex + 1).padStart(3)} │ </Text>
+				<Box width={6}>
+					<Text color={isCursorLine ? 'white' : 'gray'} backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
 				</Box>
-				<Box>
-					<Text>
+				<Box flexGrow={1}>
+					<Text backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">
 						{lineChars.map((item, x) => {
 							let isSelected = false;
 							if (realSelection) {
@@ -345,7 +407,7 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 							const isCursor = isCursorLine && x === activeCursorX;
 
-							let bgColor: string | undefined;
+							let bgColor: string | undefined = isCursorLine ? 'gray' : undefined;
 							let fgColor: string | undefined = item.color;
 
 							if (isCursor) {
@@ -378,30 +440,36 @@ const App: React.FC<AppProps> = ({ filePaths }) => {
 
 	return (
 		<Box flexDirection="column" height={terminalHeight}>
-			<Box paddingX={1}>
+			<Box paddingX={1} flexShrink={0} height={1}>
 				<Text backgroundColor="cyan" color="black" bold> CLI EDITOR </Text>
 				<Box flexGrow={1} />
-				<Text backgroundColor="cyan" color="black"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
+				<Text backgroundColor="cyan" color="black" wrap="truncate"> {activeFile.path}{activeFile.isDirty ? '*' : ''} </Text>
 			</Box>
 
-			<Box paddingX={1} marginTop={1} gap={2}>
+			<Box paddingX={1} flexShrink={0} height={3}>
 				{files.map((f, i) => (
 					<Box key={i} borderStyle="single" borderColor={i === activeFileIndex ? 'cyan' : 'gray'} paddingX={1}>
-						<Text bold={i === activeFileIndex} color={i === activeFileIndex ? 'cyan' : 'gray'}>
+						<Text bold={i === activeFileIndex} color={i === activeFileIndex ? 'cyan' : 'gray'} wrap="truncate">
 							{i + 1}: {path.basename(f.path)}{f.isDirty ? '*' : ''}
 						</Text>
 					</Box>
 				))}
 			</Box>
 
-			<Box flexDirection="column" flexGrow={1} paddingX={1} marginTop={1}>
+			<Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1}>
 				{visibleLines.map((line, index) => renderHighlightedLine(line, activeFile.scroll + index))}
 			</Box>
 
-			<Box paddingX={1}>
-				<Text backgroundColor="gray" color="black"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} │ {activeFile.lang.toUpperCase()} </Text>
-				<Box flexGrow={1} />
-				<Text backgroundColor="gray" color="black"> Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^S Save │ ^Q Quit </Text>
+			<Box paddingX={1} flexShrink={0} height={1}>
+				{gotoLineInput !== null ? (
+					<Text backgroundColor="blue" color="white"> Go to line: {gotoLineInput}_ </Text>
+				) : (
+					<>
+						<Text backgroundColor="gray" color="black" wrap="truncate"> Ln {activeFile.cursor.y + 1}, Col {activeFile.cursor.x + 1} │ {activeFile.lang.toUpperCase()} </Text>
+						<Box flexGrow={1} />
+						<Text backgroundColor="gray" color="black" wrap="truncate"> Shift+Arrows: Mark │ ^K Copy │ ^U Paste │ ^G Goto │ ^S Save │ ^Q Quit </Text>
+					</>
+				)}
 			</Box>
 		</Box>
 	);
