@@ -1,5 +1,8 @@
 # Terminal Editor
 
+<img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/34b9ce63-8010-4929-8294-66c8d3e2a579" />
+
+
 A modern terminal text editor built with Ink and Shiki.
 
 ## Features
