@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { Highlighter } from 'shiki';
 import { FileState, Selection } from '../types.js';
 
@@ -7,10 +7,12 @@ interface EditorProps {
 	activeFile: FileState | null;
 	highlighter: Highlighter | null;
 	viewHeight: number;
+	availableWidth: number;
 	showGitGutter: boolean;
+	showExplorer: boolean;
 }
 
-const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, showGitGutter }) => {
+const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, availableWidth, showGitGutter, showExplorer }) => {
 	if (!activeFile) {
 		return (
 			<Box flexGrow={1} alignItems="center" justifyContent="center">
@@ -27,6 +29,9 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, sh
 		const selection = activeFile.selection;
 		const gitChanges = activeFile.gitChanges;
 
+		// Replace tabs with spaces for consistent width
+		const processedLine = line.replace(/\t/g, '    ');
+
 		let realSelection: Selection | null = null;
 		if (selection) {
 			const { start, end } = selection;
@@ -35,8 +40,8 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, sh
 		}
 
 		const tokens = highlighter && activeFile.lang !== 'text'
-			? highlighter.codeToTokens(line, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
-			: [{ content: line || ' ', color: undefined }];
+			? highlighter.codeToTokens(processedLine, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
+			: [{ content: processedLine || ' ', color: undefined }];
 
 		const lineChars: { char: string; color?: string }[] = [];
 		tokens.forEach(t => {
@@ -47,22 +52,25 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, sh
 
 		if (lineChars.length === 0) lineChars.push({ char: ' ' });
 
+		const visibleChars = lineChars.slice(activeFile.scrollX, activeFile.scrollX + availableWidth);
+
 		let lineNumberColor = isCursorLine ? 'white' : 'gray';
 		if (showGitGutter && gitChanges?.addedLines.has(lineIndex)) {
 			lineNumberColor = 'green';
 		}
 
 		return (
-			<Box key={lineIndex}>
-				<Box width={6}>
+			<Box key={lineIndex} height={1} flexShrink={0}>
+				<Box width={6} flexShrink={0}>
 					{showGitGutter && gitChanges?.deletedLines.has(lineIndex) && (
 						<Box position="absolute" marginLeft={-1}><Text color="red">^</Text></Box>
 					)}
 					<Text color={lineNumberColor} backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
 				</Box>
-				<Box flexGrow={1}>
+				<Box flexGrow={1} flexShrink={0}>
 					<Text backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">
-						{lineChars.map((item, x) => {
+						{visibleChars.map((item, i) => {
+							const x = i + activeFile.scrollX;
 							let isSelected = false;
 							if (realSelection) {
 								const { start, end } = realSelection;
@@ -86,12 +94,12 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, sh
 							}
 
 							return (
-								<Text key={x} backgroundColor={bgColor} color={fgColor}>
+								<Text key={i} backgroundColor={bgColor} color={fgColor}>
 									{item.char}
 								</Text>
 							);
 						})}
-						{isCursorLine && activeCursorX === lineChars.length && (
+						{isCursorLine && activeCursorX >= (activeFile.scrollX + visibleChars.length) && activeCursorX < (activeFile.scrollX + availableWidth) && (
 							<Text backgroundColor="white" color="black"> </Text>
 						)}
 					</Text>
@@ -101,7 +109,7 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, sh
 	};
 
 	return (
-		<Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1}>
+		<Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1} height={viewHeight}>
 			{visibleLines.map((line, index) => renderHighlightedLine(line, activeFile.scroll + index))}
 		</Box>
 	);

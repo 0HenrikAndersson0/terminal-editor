@@ -5,15 +5,24 @@ import clipboard from 'clipboardy';
 export const useEditor = (
 	activeFile: FileState | null,
 	updateActiveFile: (updater: (file: FileState) => FileState) => void,
-	viewHeight: number
+	viewHeight: number,
+	availableWidth: number
 ) => {
 	const moveCursor = useCallback((key: any, shift: boolean) => {
 		if (!activeFile) return;
+
+		const updateXScroll = (f: FileState, newX: number): number => {
+			if (newX < f.scrollX) return newX;
+			if (newX >= f.scrollX + availableWidth) return newX - availableWidth + 1;
+			return f.scrollX;
+		};
 
 		if (shift) {
 			updateActiveFile(f => {
 				const start = f.selection ? f.selection.start : { ...f.cursor };
 				const newCursor = { ...f.cursor };
+				let newScrollX = f.scrollX;
+
 				if (key.upArrow) {
 					const newY = Math.max(0, f.cursor.y - 1);
 					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
@@ -39,7 +48,8 @@ export const useEditor = (
 					if (f.cursor.x < f.lines[f.cursor.y].length) newCursor.x = f.cursor.x + 1;
 					else if (f.cursor.y < f.lines.length - 1) { newCursor.y = f.cursor.y + 1; newCursor.x = 0; }
 				}
-				return { ...f, cursor: newCursor, selection: { start, end: newCursor } };
+				newScrollX = updateXScroll(f, newCursor.x);
+				return { ...f, cursor: newCursor, scrollX: newScrollX, selection: { start, end: newCursor } };
 			});
 		} else {
 			if (key.upArrow) {
@@ -47,79 +57,97 @@ export const useEditor = (
 					const newY = Math.max(0, f.cursor.y - 1);
 					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
 					const ti = f.lines[newY].match(/^\s*/)?.[0].length || 0;
-					return { ...f, cursor: { y: newY, x: f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length) }, selection: null };
+					const newX = f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length);
+					return { ...f, cursor: { y: newY, x: newX }, scrollX: updateXScroll(f, newX), selection: null };
 				});
 			} else if (key.downArrow) {
 				updateActiveFile(f => {
 					const newY = Math.min(f.lines.length - 1, f.cursor.y + 1);
 					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
 					const ti = f.lines[newY].match(/^\s*/)?.[0].length || 0;
-					return { ...f, cursor: { y: newY, x: f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length) }, selection: null };
+					const newX = f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length);
+					return { ...f, cursor: { y: newY, x: newX }, scrollX: updateXScroll(f, newX), selection: null };
 				});
 			} else if (key.pageUp) {
 				updateActiveFile(f => {
 					const newY = Math.max(0, f.cursor.y - viewHeight);
-					return { ...f, cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) }, scroll: Math.max(0, f.scroll - viewHeight), selection: null };
+					const newX = Math.min(f.cursor.x, f.lines[newY].length);
+					return { ...f, cursor: { y: newY, x: newX }, scroll: Math.max(0, f.scroll - viewHeight), scrollX: updateXScroll(f, newX), selection: null };
 				});
 			} else if (key.pageDown) {
 				updateActiveFile(f => {
 					const newY = Math.min(f.lines.length - 1, f.cursor.y + viewHeight);
-					return { ...f, cursor: { y: newY, x: Math.min(f.cursor.x, f.lines[newY].length) }, scroll: Math.min(Math.max(0, f.lines.length - viewHeight), f.scroll + viewHeight), selection: null };
+					const newX = Math.min(f.cursor.x, f.lines[newY].length);
+					return { ...f, cursor: { y: newY, x: newX }, scroll: Math.min(Math.max(0, f.lines.length - viewHeight), f.scroll + viewHeight), scrollX: updateXScroll(f, newX), selection: null };
 				});
 			} else if (key.leftArrow) {
 				updateActiveFile(f => {
-					if (f.cursor.x > 0) return { ...f, cursor: { ...f.cursor, x: f.cursor.x - 1 }, selection: null };
-					if (f.cursor.y > 0) return { ...f, cursor: { y: f.cursor.y - 1, x: f.lines[f.cursor.y - 1].length }, selection: null };
-					return { ...f, selection: null };
+					let newCursor = { ...f.cursor };
+					if (f.cursor.x > 0) newCursor.x = f.cursor.x - 1;
+					else if (f.cursor.y > 0) { newCursor.y = f.cursor.y - 1; newCursor.x = f.lines[newCursor.y].length; }
+					return { ...f, cursor: newCursor, scrollX: updateXScroll(f, newCursor.x), selection: null };
 				});
 			} else if (key.rightArrow) {
 				updateActiveFile(f => {
-					if (f.cursor.x < f.lines[f.cursor.y].length) return { ...f, cursor: { ...f.cursor, x: f.cursor.x + 1 }, selection: null };
-					if (f.cursor.y < f.lines.length - 1) return { ...f, cursor: { y: f.cursor.y + 1, x: 0 }, selection: null };
-					return { ...f, selection: null };
+					let newCursor = { ...f.cursor };
+					if (f.cursor.x < f.lines[f.cursor.y].length) newCursor.x = f.cursor.x + 1;
+					else if (f.cursor.y < f.lines.length - 1) { newCursor.y = f.cursor.y + 1; newCursor.x = 0; }
+					return { ...f, cursor: newCursor, scrollX: updateXScroll(f, newCursor.x), selection: null };
 				});
 			}
 		}
-	}, [activeFile, updateActiveFile, viewHeight]);
+	}, [activeFile, updateActiveFile, viewHeight, availableWidth]);
 
 	const handleTextDelete = useCallback((backspace: boolean, del: boolean) => {
 		updateActiveFile(f => {
+			let nf = { ...f };
 			if (backspace) {
 				if (f.cursor.x > 0) {
-					const l = f.lines[f.cursor.y], nl = [...f.lines]; nl[f.cursor.y] = l.slice(0, f.cursor.x - 1) + l.slice(f.cursor.x);
-					return { ...f, lines: nl, cursor: { ...f.cursor, x: f.cursor.x - 1 }, isDirty: true };
+					const l = f.lines[f.cursor.y];
+					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x - 1) + l.slice(f.cursor.x);
+					nf.cursor = { ...f.cursor, x: f.cursor.x - 1 };
+					nf.isDirty = true;
 				} else if (f.cursor.y > 0) {
-					const pl = f.lines[f.cursor.y - 1], cl = f.lines[f.cursor.y], nl = [...f.lines]; nl[f.cursor.y - 1] = pl + cl; nl.splice(f.cursor.y, 1);
-					return { ...f, lines: nl, cursor: { y: f.cursor.y - 1, x: pl.length }, isDirty: true };
+					const pl = f.lines[f.cursor.y - 1];
+					nf.lines = [...f.lines]; nf.lines[f.cursor.y - 1] = pl + f.lines[f.cursor.y]; nf.lines.splice(f.cursor.y, 1);
+					nf.cursor = { y: f.cursor.y - 1, x: pl.length };
+					nf.isDirty = true;
 				}
 			} else if (del) {
 				const l = f.lines[f.cursor.y];
 				if (f.cursor.x < l.length) {
-					const nl = [...f.lines]; nl[f.cursor.y] = l.slice(0, f.cursor.x) + l.slice(f.cursor.x + 1);
-					return { ...f, lines: nl, isDirty: true };
+					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x) + l.slice(f.cursor.x + 1);
+					nf.isDirty = true;
 				} else if (f.cursor.y < f.lines.length - 1) {
-					const nxl = f.lines[f.cursor.y + 1], nl = [...f.lines]; nl[f.cursor.y] = l + nxl; nl.splice(f.cursor.y + 1, 1);
-					return { ...f, lines: nl, isDirty: true };
+					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l + f.lines[f.cursor.y + 1]; nf.lines.splice(f.cursor.y + 1, 1);
+					nf.isDirty = true;
 				}
 			}
-			return f;
+			// Update scrollX after delete
+			if (nf.cursor.x < nf.scrollX) nf.scrollX = nf.cursor.x;
+			else if (nf.cursor.x >= nf.scrollX + availableWidth) nf.scrollX = nf.cursor.x - availableWidth + 1;
+			return nf;
 		});
-	}, [updateActiveFile]);
+	}, [updateActiveFile, availableWidth]);
 
 	const handleTextInput = useCallback((input: string) => {
 		updateActiveFile(f => {
 			const l = f.lines[f.cursor.y], nl = [...f.lines]; nl[f.cursor.y] = l.slice(0, f.cursor.x) + input + l.slice(f.cursor.x);
-			return { ...f, lines: nl, cursor: { ...f.cursor, x: f.cursor.x + input.length }, isDirty: true };
+			const newX = f.cursor.x + input.length;
+			let newScrollX = f.scrollX;
+			if (newX >= f.scrollX + availableWidth) newScrollX = newX - availableWidth + 1;
+			return { ...f, lines: nl, cursor: { ...f.cursor, x: newX }, scrollX: newScrollX, isDirty: true };
 		});
-	}, [updateActiveFile]);
+	}, [updateActiveFile, availableWidth]);
 
 	const handleEnter = useCallback(() => {
 		updateActiveFile(f => {
 			const cl = f.lines[f.cursor.y], ind = cl.match(/^\s*/)?.[0] || '', before = cl.slice(0, f.cursor.x), after = cl.slice(f.cursor.x);
 			const nl = [...f.lines]; nl[f.cursor.y] = before; nl.splice(f.cursor.y + 1, 0, ind + after);
-			return { ...f, lines: nl, cursor: { y: f.cursor.y + 1, x: ind.length }, isDirty: true };
+			const newX = ind.length;
+			return { ...f, lines: nl, cursor: { y: f.cursor.y + 1, x: newX }, scrollX: newX < availableWidth ? 0 : newX - availableWidth + 1, isDirty: true };
 		});
-	}, [updateActiveFile]);
+	}, [updateActiveFile, availableWidth]);
 
 	const copyToClipboard = useCallback(() => {
 		if (activeFile?.selection) {

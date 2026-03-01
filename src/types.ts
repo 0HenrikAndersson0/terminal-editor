@@ -21,6 +21,7 @@ export interface FileState {
 	lines: string[];
 	cursor: { x: number; y: number };
 	scroll: number;
+	scrollX: number;
 	loading: boolean;
 	error: string | null;
 	lang: string;

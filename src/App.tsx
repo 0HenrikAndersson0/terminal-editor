@@ -40,9 +40,14 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 
 	const { stdout } = useStdout();
 	const terminalHeight = stdout?.rows ?? 24;
+	const terminalWidth = stdout?.columns ?? 80;
 	const viewHeight = Math.max(1, terminalHeight - 6);
+	const explorerWidth = showExplorer ? 30 : 0;
+	const lineNumWidth = 6;
+	const paddingWidth = 2;
+	const availableWidth = Math.max(1, terminalWidth - explorerWidth - lineNumWidth - paddingWidth);
 
-	const { moveCursor, handleTextDelete, handleTextInput, handleEnter, copyToClipboard, pasteFromClipboard } = useEditor(activeFile, updateActiveFile, viewHeight);
+	const { moveCursor, handleTextDelete, handleTextInput, handleEnter, copyToClipboard, pasteFromClipboard } = useEditor(activeFile, updateActiveFile, viewHeight, availableWidth);
 
 	useEffect(() => {
 		(async () => {
@@ -61,7 +66,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 					if (s && s.isDirectory()) continue;
 					initialFiles.push({
 						path: fp === '.' ? 'untitled' : fp, lines: (s ? await readFile(fullPath) : '').split('\n'),
-						cursor: { x: 0, y: 0 }, scroll: 0, loading: false, error: null, lang: getLangFromPath(fp), isDirty: false, selection: null, gitChanges: null
+						cursor: { x: 0, y: 0 }, scroll: 0, scrollX: 0, loading: false, error: null, lang: getLangFromPath(fp), isDirty: false, selection: null, gitChanges: null
 					});
 				} catch (err) {}
 			}
@@ -111,7 +116,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 						if (idx !== -1) setActiveFileIndex(idx);
 						else {
 							const content = await readFile(node.path);
-							const nf: FileState = { path: node.path, lines: content.split('\n'), cursor: { x: 0, y: 0 }, scroll: 0, loading: false, error: null, lang: getLangFromPath(node.path), isDirty: false, selection: null, gitChanges: null };
+							const nf: FileState = { path: node.path, lines: content.split('\n'), cursor: { x: 0, y: 0 }, scroll: 0, scrollX: 0, loading: false, error: null, lang: getLangFromPath(node.path), isDirty: false, selection: null, gitChanges: null };
 							setFiles(p => { const next = [...p, nf]; setActiveFileIndex(next.length - 1); return next; });
 						}
 						setShowExplorer(false);
@@ -142,9 +147,13 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 
 	useEffect(() => {
 		if (!activeFile) return;
-		if (activeFile.cursor.y < activeFile.scroll) updateActiveFile(f => ({ ...f, scroll: f.cursor.y }));
-		else if (activeFile.cursor.y >= activeFile.scroll + viewHeight) updateActiveFile(f => ({ ...f, scroll: f.cursor.y - viewHeight + 1 }));
-	}, [activeFile?.cursor.y, viewHeight]);
+		const maxScroll = Math.max(0, activeFile.lines.length - viewHeight);
+		if (activeFile.cursor.y < activeFile.scroll) {
+			updateActiveFile(f => ({ ...f, scroll: Math.min(maxScroll, f.cursor.y) }));
+		} else if (activeFile.cursor.y >= activeFile.scroll + viewHeight) {
+			updateActiveFile(f => ({ ...f, scroll: Math.max(0, Math.min(maxScroll, f.cursor.y - viewHeight + 1)) }));
+		}
+	}, [activeFile?.cursor.y, viewHeight, activeFile?.lines.length]);
 
 	if (!highlighter) return <Box padding={1}><Text color="cyan">Initializing highlighter...</Text></Box>;
 	if (activeFile?.error) return <Box padding={1}><Text color="red">Error: {activeFile.error}</Text></Box>;
@@ -153,10 +162,10 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 		<Box flexDirection="column" height={terminalHeight}>
 			<Header activeFile={activeFile} />
 			<Box flexGrow={1} flexDirection="row">
-				{showExplorer && <Explorer nodes={explorerNodes} selectionIndex={explorerSelectionIndex} terminalHeight={terminalHeight} />}
+				{showExplorer && <Explorer nodes={explorerNodes} selectionIndex={explorerSelectionIndex} terminalHeight={terminalHeight - 3} />}
 				<Box flexDirection="column" flexGrow={1}>
 					<TabBar files={files} activeFileIndex={activeFileIndex} />
-					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} showGitGutter={showGitGutter} />
+					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} availableWidth={availableWidth} showGitGutter={showGitGutter} showExplorer={showExplorer} />
 					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} />
 				</Box>
 			</Box>
