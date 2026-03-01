@@ -1,4 +1,7 @@
-# edru
+# Edru
+
+<img width="200" height="200" alt="image" src="https://github.com/user-attachments/assets/99c0a79c-fec7-455a-9e13-971a1c3a031a" />
+
 
 A modern terminal text editor built with Ink and Shiki.
 
