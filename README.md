@@ -1,4 +1,4 @@
-# zlyn
+# luxt
 
 A modern terminal text editor built with Ink and Shiki.
 
@@ -22,7 +22,7 @@ A modern terminal text editor built with Ink and Shiki.
 ```bash
 npm install
 npm run build
-npm link # To use the 'zlyn' command globally
+npm link # To use the 'luxt' command globally
 ```
 
 ## Usage
@@ -31,13 +31,13 @@ You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-zlyn .
+luxt .
 
 # Open a specific file
-zlyn README.md
+luxt README.md
 
 # Open multiple files
-zlyn src/App.tsx src/index.tsx
+luxt src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts
