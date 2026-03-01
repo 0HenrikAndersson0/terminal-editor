@@ -1,4 +1,4 @@
-# melk
+# quell
 
 A modern terminal text editor built with Ink and Shiki.
 
@@ -22,7 +22,7 @@ A modern terminal text editor built with Ink and Shiki.
 ```bash
 npm install
 npm run build
-npm link # To use the 'melk' command globally
+npm link # To use the 'quell' command globally
 ```
 
 ## Usage
@@ -31,13 +31,13 @@ You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-melk .
+quell .
 
 # Open a specific file
-melk README.md
+quell README.md
 
 # Open multiple files
-melk src/App.tsx src/index.tsx
+quell src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts

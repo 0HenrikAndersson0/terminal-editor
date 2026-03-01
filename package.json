@@ -1,9 +1,9 @@
 {
-  "name": "melk",
+  "name": "quell",
   "version": "1.0.0",
   "description": "A modern terminal text editor with Ink and Shiki",
   "bin": {
-    "melk": "dist/index.js"
+    "quell": "dist/index.js"
   },
   "main": "dist/index.js",
   "type": "module",
