@@ -1,4 +1,4 @@
-# luxt
+# edru
 
 A modern terminal text editor built with Ink and Shiki.
 
@@ -22,7 +22,7 @@ A modern terminal text editor built with Ink and Shiki.
 ```bash
 npm install
 npm run build
-npm link # To use the 'luxt' command globally
+npm link # To use the 'edru' command globally
 ```
 
 ## Usage
@@ -31,13 +31,13 @@ You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-luxt .
+edru .
 
 # Open a specific file
-luxt README.md
+edru README.md
 
 # Open multiple files
-luxt src/App.tsx src/index.tsx
+edru src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts
