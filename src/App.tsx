@@ -24,10 +24,36 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	const [explorerNodes, setExplorerNodes] = useState<FileNode[]>([]);
 	const [explorerSelectionIndex, setExplorerSelectionIndex] = useState(0);
 	const [showGitGutter, setShowGitGutter] = useState(false);
+	const [searchInput, setSearchInput] = useState<string | null>(null);
+	const [searchResults, setSearchResults] = useState<{ x: number; y: number }[]>([]);
+	const [searchIndex, setSearchIndex] = useState(0);
 
 	const { loadDirectory, getLangFromPath, readFile, writeFile } = useFileSystem();
 	const { updateGitChanges } = useGit(setFiles);
 	const activeFile = files[activeFileIndex] || null;
+
+	useEffect(() => {
+		if (searchInput === null || !activeFile || searchInput === '') {
+			setSearchResults([]);
+			setSearchIndex(0);
+			return;
+		}
+
+		const results: { x: number; y: number }[] = [];
+		const lowerSearch = searchInput.toLowerCase();
+		activeFile.lines.forEach((line, y) => {
+			const lowerLine = line.toLowerCase();
+			let x = lowerLine.indexOf(lowerSearch);
+			while (x !== -1) {
+				results.push({ x, y });
+				x = lowerLine.indexOf(lowerSearch, x + 1);
+			}
+		});
+		setSearchResults(results);
+		if (searchIndex >= results.length) {
+			setSearchIndex(Math.max(0, results.length - 1));
+		}
+	}, [searchInput, activeFile?.lines]);
 
 	const updateActiveFile = useCallback((updater: (file: FileState) => FileState) => {
 		setFiles(prev => {
@@ -78,7 +104,44 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	useInput((input, key) => {
 		if (key.ctrl && input === 'd') { setShowGitGutter(p => !p); if (!showGitGutter) updateGitChanges(activeFileIndex); return; }
 		if (key.ctrl && input === 'e') { setShowExplorer(p => !p); return; }
+		if (key.ctrl && input === 'f') { setSearchInput(p => p === null ? '' : null); return; }
 		if (key.ctrl && input === 'g') { setGotoLineInput(p => p === null ? '' : null); return; }
+
+		if (searchInput !== null) {
+			if (key.escape) setSearchInput(null);
+			else if (key.tab || key.return) {
+				if (searchResults.length > 0) {
+					const step = key.shift ? -1 : 1;
+					const nextIndex = (searchIndex + step + searchResults.length) % searchResults.length;
+					setSearchIndex(nextIndex);
+					const match = searchResults[nextIndex];
+					updateActiveFile(f => {
+						const line = f.lines[match.y];
+						let visualX = 0;
+						for (let i = 0; i < match.x; i++) {
+							visualX += line[i] === '\t' ? 4 : 1;
+						}
+
+						let newScrollX = f.scrollX;
+						if (visualX < f.scrollX) newScrollX = visualX;
+						else if (visualX >= f.scrollX + availableWidth) newScrollX = visualX - availableWidth + 1;
+
+						let newScroll = f.scroll;
+						if (match.y < f.scroll) newScroll = match.y;
+						else if (match.y >= f.scroll + viewHeight) newScroll = match.y - viewHeight + 1;
+
+						return { ...f, cursor: { y: match.y, x: match.x }, scrollX: newScrollX, scroll: newScroll };
+					});
+				}
+			} else if (key.backspace || input === '\x7f' || input === '\b') {
+				setSearchInput(p => p!.slice(0, -1));
+				setSearchIndex(0);
+			} else if (input && !key.ctrl && !key.meta && !['\r', '\n', '\t'].includes(input)) {
+				setSearchInput(p => p + input);
+				setSearchIndex(0);
+			}
+			return;
+		}
 
 		if (gotoLineInput !== null) {
 			if (key.escape) setGotoLineInput(null);
@@ -165,8 +228,8 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 				{showExplorer && <Explorer nodes={explorerNodes} selectionIndex={explorerSelectionIndex} terminalHeight={terminalHeight - 3} />}
 				<Box flexDirection="column" flexGrow={1}>
 					<TabBar files={files} activeFileIndex={activeFileIndex} />
-					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} availableWidth={availableWidth} showGitGutter={showGitGutter} showExplorer={showExplorer} />
-					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} />
+					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} availableWidth={availableWidth} showGitGutter={showGitGutter} showExplorer={showExplorer} searchInput={searchInput} searchResults={searchResults} searchIndex={searchIndex} />
+					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} searchInput={searchInput} searchResultsCount={searchResults.length} searchIndex={searchIndex} />
 				</Box>
 			</Box>
 		</Box>

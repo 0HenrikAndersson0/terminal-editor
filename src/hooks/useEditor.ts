@@ -8,12 +8,22 @@ export const useEditor = (
 	viewHeight: number,
 	availableWidth: number
 ) => {
+	const getVisualX = (line: string, rawX: number): number => {
+		let visualX = 0;
+		for (let i = 0; i < rawX; i++) {
+			visualX += line[i] === '\t' ? 4 : 1;
+		}
+		return visualX;
+	};
+
 	const moveCursor = useCallback((key: any, shift: boolean) => {
 		if (!activeFile) return;
 
 		const updateXScroll = (f: FileState, newX: number): number => {
-			if (newX < f.scrollX) return newX;
-			if (newX >= f.scrollX + availableWidth) return newX - availableWidth + 1;
+			const line = f.lines[f.cursor.y] || '';
+			const visualX = getVisualX(line, newX);
+			if (visualX < f.scrollX) return visualX;
+			if (visualX >= f.scrollX + availableWidth) return visualX - availableWidth + 1;
 			return f.scrollX;
 		};
 
@@ -124,30 +134,34 @@ export const useEditor = (
 				}
 			}
 			// Update scrollX after delete
-			if (nf.cursor.x < nf.scrollX) nf.scrollX = nf.cursor.x;
-			else if (nf.cursor.x >= nf.scrollX + availableWidth) nf.scrollX = nf.cursor.x - availableWidth + 1;
+			const line = nf.lines[nf.cursor.y] || '';
+			const visualX = getVisualX(line, nf.cursor.x);
+			if (visualX < nf.scrollX) nf.scrollX = visualX;
+			else if (visualX >= nf.scrollX + availableWidth) nf.scrollX = visualX - availableWidth + 1;
 			return nf;
 		});
-	}, [updateActiveFile, availableWidth]);
+	}, [updateActiveFile, availableWidth, getVisualX]);
 
 	const handleTextInput = useCallback((input: string) => {
 		updateActiveFile(f => {
 			const l = f.lines[f.cursor.y], nl = [...f.lines]; nl[f.cursor.y] = l.slice(0, f.cursor.x) + input + l.slice(f.cursor.x);
 			const newX = f.cursor.x + input.length;
 			let newScrollX = f.scrollX;
-			if (newX >= f.scrollX + availableWidth) newScrollX = newX - availableWidth + 1;
+			const visualX = getVisualX(nl[f.cursor.y], newX);
+			if (visualX >= f.scrollX + availableWidth) newScrollX = visualX - availableWidth + 1;
 			return { ...f, lines: nl, cursor: { ...f.cursor, x: newX }, scrollX: newScrollX, isDirty: true };
 		});
-	}, [updateActiveFile, availableWidth]);
+	}, [updateActiveFile, availableWidth, getVisualX]);
 
 	const handleEnter = useCallback(() => {
 		updateActiveFile(f => {
 			const cl = f.lines[f.cursor.y], ind = cl.match(/^\s*/)?.[0] || '', before = cl.slice(0, f.cursor.x), after = cl.slice(f.cursor.x);
 			const nl = [...f.lines]; nl[f.cursor.y] = before; nl.splice(f.cursor.y + 1, 0, ind + after);
 			const newX = ind.length;
-			return { ...f, lines: nl, cursor: { y: f.cursor.y + 1, x: newX }, scrollX: newX < availableWidth ? 0 : newX - availableWidth + 1, isDirty: true };
+			const visualX = getVisualX(ind, newX);
+			return { ...f, lines: nl, cursor: { y: f.cursor.y + 1, x: newX }, scrollX: visualX < availableWidth ? 0 : visualX - availableWidth + 1, isDirty: true };
 		});
-	}, [updateActiveFile, availableWidth]);
+	}, [updateActiveFile, availableWidth, getVisualX]);
 
 	const copyToClipboard = useCallback(() => {
 		if (activeFile?.selection) {

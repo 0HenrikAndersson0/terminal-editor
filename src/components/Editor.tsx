@@ -10,9 +10,12 @@ interface EditorProps {
 	availableWidth: number;
 	showGitGutter: boolean;
 	showExplorer: boolean;
+	searchInput?: string | null;
+	searchResults?: { x: number; y: number }[];
+	searchIndex?: number;
 }
 
-const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, availableWidth, showGitGutter, showExplorer }) => {
+const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, availableWidth, showGitGutter, showExplorer, searchInput, searchResults = [], searchIndex = 0 }) => {
 	if (!activeFile) {
 		return (
 			<Box flexGrow={1} alignItems="center" justifyContent="center">
@@ -43,14 +46,25 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 			? highlighter.codeToTokens(processedLine, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
 			: [{ content: processedLine || ' ', color: undefined }];
 
-		const lineChars: { char: string; color?: string }[] = [];
+		const rawXMapping: number[] = [];
+		for (let i = 0; i < line.length; i++) {
+			if (line[i] === '\t') {
+				for (let j = 0; j < 4; j++) rawXMapping.push(i);
+			} else {
+				rawXMapping.push(i);
+			}
+		}
+
+		const lineChars: { char: string; color?: string; rawX: number }[] = [];
+		let visualIdx = 0;
 		tokens.forEach(t => {
 			t.content.split('').forEach(char => {
-				lineChars.push({ char, color: t.color });
+				lineChars.push({ char, color: t.color, rawX: rawXMapping[visualIdx] ?? visualIdx });
+				visualIdx++;
 			});
 		});
 
-		if (lineChars.length === 0) lineChars.push({ char: ' ' });
+		if (lineChars.length === 0) lineChars.push({ char: ' ', rawX: 0 });
 
 		const visibleChars = lineChars.slice(activeFile.scrollX, activeFile.scrollX + availableWidth);
 
@@ -75,12 +89,26 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 							if (realSelection) {
 								const { start, end } = realSelection;
 								if (lineIndex > start.y && lineIndex < end.y) isSelected = true;
-								else if (lineIndex === start.y && lineIndex === end.y) isSelected = x >= start.x && x < end.x;
-								else if (lineIndex === start.y) isSelected = x >= start.x;
-								else if (lineIndex === end.y) isSelected = x < end.x;
+								else if (lineIndex === start.y && lineIndex === end.y) isSelected = item.rawX >= start.x && item.rawX < end.x;
+								else if (lineIndex === start.y) isSelected = item.rawX >= start.x;
+								else if (lineIndex === end.y) isSelected = item.rawX < end.x;
 							}
 
-							const isCursor = isCursorLine && x === activeCursorX;
+							const isCursor = isCursorLine && item.rawX === activeCursorX;
+
+							let isSearchMatch = false;
+							let isActiveSearchMatch = false;
+
+							if (searchInput) {
+								for (let i = 0; i < searchResults.length; i++) {
+									const res = searchResults[i];
+									if (res.y === lineIndex && item.rawX >= res.x && item.rawX < res.x + searchInput.length) {
+										isSearchMatch = true;
+										if (i === searchIndex) isActiveSearchMatch = true;
+										break;
+									}
+								}
+							}
 
 							let bgColor: string | undefined = isCursorLine ? 'gray' : undefined;
 							let fgColor: string | undefined = item.color;
@@ -91,6 +119,12 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 							} else if (isSelected) {
 								bgColor = 'blue';
 								fgColor = 'white';
+							} else if (isActiveSearchMatch) {
+								bgColor = 'green';
+								fgColor = 'black';
+							} else if (isSearchMatch) {
+								bgColor = 'yellow';
+								fgColor = 'black';
 							}
 
 							return (
