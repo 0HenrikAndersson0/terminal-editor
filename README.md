@@ -6,6 +6,7 @@ A modern terminal text editor built with Ink and Shiki.
 
 - **Syntax Highlighting:** Powered by Shiki with VS Code-grade accuracy.
 - **Project Explorer:** Toggle a sidebar with `Ctrl+E` to navigate folder structures and open files.
+- **Search & Highlight:** Press `Ctrl+F` to search for text within the current file. Use `Tab` or `Enter` to cycle through results.
 - **Git Gutter:** Toggle with `Ctrl+D` to see added/modified lines (green) and deletions (red markers).
 - **Horizontal Scrolling:** Seamlessly navigate long lines of code.
 - **Auto-Indentation:** Automatically matches the indentation of the previous line when pressing Enter.
@@ -47,6 +48,7 @@ edru src/App.tsx src/index.tsx
 - `PageUp / PageDown`: Scroll one page
 - `Ctrl + E`: Toggle Project Explorer (Sidebar)
 - `Ctrl + D`: Toggle Git Gutter (Changes)
+- `Ctrl + F`: Search & Highlight
 - `Ctrl + G`: Go to line
 - `Ctrl + N`: Next file tab
 - `Ctrl + P`: Previous file tab
