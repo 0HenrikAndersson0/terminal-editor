@@ -1,4 +1,4 @@
-# Terminal Editor
+# Vimps
 
 A modern terminal text editor built with Ink and Shiki.
 
@@ -22,7 +22,7 @@ A modern terminal text editor built with Ink and Shiki.
 ```bash
 npm install
 npm run build
-npm link # To use the 'terminal-editor' command globally
+npm link # To use the 'vimps' command globally
 ```
 
 ## Usage
@@ -31,13 +31,13 @@ You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-terminal-editor .
+vimps .
 
 # Open a specific file
-terminal-editor README.md
+vimps README.md
 
 # Open multiple files
-terminal-editor src/App.tsx src/index.tsx
+vimps src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts
