@@ -1,8 +1,5 @@
 # Terminal Editor
 
-<img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/34b9ce63-8010-4929-8294-66c8d3e2a579" />
-
-
 A modern terminal text editor built with Ink and Shiki.
 
 ## Features
@@ -10,6 +7,7 @@ A modern terminal text editor built with Ink and Shiki.
 - **Syntax Highlighting:** Powered by Shiki with VS Code-grade accuracy.
 - **Project Explorer:** Toggle a sidebar with `Ctrl+E` to navigate folder structures and open files.
 - **Git Gutter:** Toggle with `Ctrl+D` to see added/modified lines (green) and deletions (red markers).
+- **Horizontal Scrolling:** Seamlessly navigate long lines of code.
 - **Auto-Indentation:** Automatically matches the indentation of the previous line when pressing Enter.
 - **Current Line Highlighting:** Visually identifies the line your cursor is on.
 - **Indentation-Aware Navigation:** Vertical movement snaps to the indentation level of lines.
@@ -19,19 +17,27 @@ A modern terminal text editor built with Ink and Shiki.
 - **Clipboard Support:** Integrated copy (`Ctrl+K`) and paste (`Ctrl+U`).
 - **Layout Stability:** UI remains intact even with long paths or large files.
 
+## Installation
+
+```bash
+npm install
+npm run build
+npm link # To use the 'terminal-editor' command globally
+```
+
 ## Usage
 
 You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-node dist/index.js .
+terminal-editor .
 
 # Open a specific file
-node dist/index.js README.md
+terminal-editor README.md
 
 # Open multiple files
-node dist/index.js src/App.tsx src/index.tsx
+terminal-editor src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts
@@ -54,6 +60,6 @@ node dist/index.js src/App.tsx src/index.tsx
 
 ```bash
 npm install
-npm run build
+npm run dev # Watch mode
 npm start -- .
 ```

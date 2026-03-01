@@ -1,12 +1,16 @@
 {
-  "name": "terminal-editor",
+  "name": "Vimps",
   "version": "1.0.0",
   "description": "A modern terminal text editor with Ink and Shiki",
+  "bin": {
+    "terminal-editor": "dist/index.js"
+  },
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "tsc && node dist/index.js",
-    "build": "tsc"
+    "start": "npm run build && node dist/index.js",
+    "build": "tsc && chmod +x dist/index.js",
+    "dev": "tsc --watch"
   },
   "keywords": [
     "terminal",
@@ -15,7 +19,7 @@
     "shiki",
     "typescript"
   ],
-  "author": "",
+  "author": "Henrik Andersson",
   "license": "ISC",
   "dependencies": {
     "chalk": "^5.3.0",
