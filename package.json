@@ -1,9 +1,9 @@
 {
-  "name": "vimps",
+  "name": "lte",
   "version": "1.0.0",
   "description": "A modern terminal text editor with Ink and Shiki",
   "bin": {
-    "vimps": "dist/index.js"
+    "lte": "dist/index.js"
   },
   "main": "dist/index.js",
   "type": "module",
