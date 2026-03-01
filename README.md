@@ -1,4 +1,4 @@
-# lted
+# melk
 
 A modern terminal text editor built with Ink and Shiki.
 
@@ -22,7 +22,7 @@ A modern terminal text editor built with Ink and Shiki.
 ```bash
 npm install
 npm run build
-npm link # To use the 'lted' command globally
+npm link # To use the 'melk' command globally
 ```
 
 ## Usage
@@ -31,13 +31,13 @@ You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-lted .
+melk .
 
 # Open a specific file
-lted README.md
+melk README.md
 
 # Open multiple files
-lted src/App.tsx src/index.tsx
+melk src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts
