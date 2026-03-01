@@ -10,6 +10,14 @@
   "files": [
     "dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0HenrikAndersson0/terminal-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/0HenrikAndersson0/terminal-editor/issues"
+  },
+  "homepage": "https://github.com/0HenrikAndersson0/terminal-editor#readme",
   "scripts": {
     "start": "npm run build && node dist/index.js",
     "build": "tsc && chmod +x dist/index.js",
