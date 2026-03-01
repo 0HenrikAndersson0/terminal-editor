@@ -1,4 +1,4 @@
-# quell
+# zlyn
 
 A modern terminal text editor built with Ink and Shiki.
 
@@ -22,7 +22,7 @@ A modern terminal text editor built with Ink and Shiki.
 ```bash
 npm install
 npm run build
-npm link # To use the 'quell' command globally
+npm link # To use the 'zlyn' command globally
 ```
 
 ## Usage
@@ -31,13 +31,13 @@ You can open a specific file or an entire directory:
 
 ```bash
 # Open current directory
-quell .
+zlyn .
 
 # Open a specific file
-quell README.md
+zlyn README.md
 
 # Open multiple files
-quell src/App.tsx src/index.tsx
+zlyn src/App.tsx src/index.tsx
 ```
 
 ## Shortcuts

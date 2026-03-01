@@ -9,7 +9,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ activeFile }) => {
 	return (
 		<Box paddingX={1} flexShrink={0} height={1}>
-			<Text backgroundColor="cyan" color="black" bold> Quell </Text>
+			<Text backgroundColor="cyan" color="black" bold> zlyn </Text>
 			<Box flexGrow={1} />
 			<Text backgroundColor="cyan" color="black" wrap="truncate"> {activeFile?.path || 'No file'}{activeFile?.isDirty ? '*' : ''} </Text>
 		</Box>
