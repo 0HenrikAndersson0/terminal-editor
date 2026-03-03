@@ -31,6 +31,14 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 		const activeCursorX = activeFile.cursor.x;
 		const selection = activeFile.selection;
 		const gitChanges = activeFile.gitChanges;
+		const isAddedLine = showGitGutter && gitChanges?.addedLines.has(lineIndex);
+
+		let lineBgColor: string | undefined = undefined;
+		if (isCursorLine) {
+			lineBgColor = 'gray';
+		} else if (isAddedLine) {
+			lineBgColor = '#1a331a';
+		}
 
 		// Replace tabs with spaces for consistent width
 		const processedLine = line.replace(/\t/g, '    ');
@@ -69,8 +77,8 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 		const visibleChars = lineChars.slice(activeFile.scrollX, activeFile.scrollX + availableWidth);
 
 		let lineNumberColor = isCursorLine ? 'white' : 'gray';
-		if (showGitGutter && gitChanges?.addedLines.has(lineIndex)) {
-			lineNumberColor = 'green';
+		if (isAddedLine) {
+			lineNumberColor = isCursorLine ? 'white' : 'green';
 		}
 
 		return (
@@ -79,10 +87,10 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 					{showGitGutter && gitChanges?.deletedLines.has(lineIndex) && (
 						<Box position="absolute" marginLeft={-1}><Text color="red">^</Text></Box>
 					)}
-					<Text color={lineNumberColor} backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
+					<Text color={lineNumberColor} backgroundColor={lineBgColor} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
 				</Box>
 				<Box flexGrow={1} flexShrink={0}>
-					<Text backgroundColor={isCursorLine ? 'gray' : undefined} wrap="truncate">
+					<Text backgroundColor={lineBgColor} wrap="truncate">
 						{visibleChars.map((item, i) => {
 							const x = i + activeFile.scrollX;
 							let isSelected = false;
@@ -110,7 +118,7 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 								}
 							}
 
-							let bgColor: string | undefined = isCursorLine ? 'gray' : undefined;
+							let bgColor: string | undefined = lineBgColor;
 							let fgColor: string | undefined = item.color;
 
 							if (isCursor) {
@@ -120,7 +128,7 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 								bgColor = 'blue';
 								fgColor = 'white';
 							} else if (isActiveSearchMatch) {
-								bgColor = 'green';
+								bgColor = 'cyan';
 								fgColor = 'black';
 							} else if (isSearchMatch) {
 								bgColor = 'yellow';

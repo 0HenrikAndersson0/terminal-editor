@@ -229,7 +229,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 				<Box flexDirection="column" flexGrow={1}>
 					<TabBar files={files} activeFileIndex={activeFileIndex} />
 					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} availableWidth={availableWidth} showGitGutter={showGitGutter} showExplorer={showExplorer} searchInput={searchInput} searchResults={searchResults} searchIndex={searchIndex} />
-					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} searchInput={searchInput} searchResultsCount={searchResults.length} searchIndex={searchIndex} />
+					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} searchInput={searchInput} searchResultsCount={searchResults.length} searchIndex={searchIndex} showGitGutter={showGitGutter} showExplorer={showExplorer} />
 				</Box>
 			</Box>
 		</Box>
