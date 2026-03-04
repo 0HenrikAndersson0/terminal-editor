@@ -2,6 +2,21 @@ import { useCallback } from 'react';
 import { FileState } from '../types.js';
 import clipboard from 'clipboardy';
 
+const removeSelection = (f: FileState): FileState => {
+	if (!f.selection) return f;
+	const { start, end } = f.selection;
+	const rs = (start.y < end.y || (start.y === end.y && start.x < end.x)) ? start : end;
+	const re = (start.y < end.y || (start.y === end.y && start.x < end.x)) ? end : start;
+	const nl = [...f.lines];
+	if (rs.y === re.y) {
+		nl[rs.y] = nl[rs.y].slice(0, rs.x) + nl[rs.y].slice(re.x);
+	} else {
+		nl[rs.y] = nl[rs.y].slice(0, rs.x) + nl[re.y].slice(re.x);
+		nl.splice(rs.y + 1, re.y - rs.y);
+	}
+	return { ...f, lines: nl, cursor: { y: rs.y, x: rs.x }, selection: null, isDirty: true };
+};
+
 export const useEditor = (
 	activeFile: FileState | null,
 	updateActiveFile: (updater: (file: FileState) => FileState) => void,
@@ -110,8 +125,10 @@ export const useEditor = (
 
 	const handleTextDelete = useCallback((backspace: boolean, del: boolean) => {
 		updateActiveFile(f => {
-			let nf = { ...f };
-			if (backspace) {
+			let nf = f.selection ? removeSelection(f) : { ...f };
+			if (f.selection) {
+				// Selection was already removed
+			} else if (backspace) {
 				if (f.cursor.x > 0) {
 					const l = f.lines[f.cursor.y];
 					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x - 1) + l.slice(f.cursor.x);
@@ -144,22 +161,24 @@ export const useEditor = (
 
 	const handleTextInput = useCallback((input: string) => {
 		updateActiveFile(f => {
-			const l = f.lines[f.cursor.y], nl = [...f.lines]; nl[f.cursor.y] = l.slice(0, f.cursor.x) + input + l.slice(f.cursor.x);
-			const newX = f.cursor.x + input.length;
-			let newScrollX = f.scrollX;
-			const visualX = getVisualX(nl[f.cursor.y], newX);
-			if (visualX >= f.scrollX + availableWidth) newScrollX = visualX - availableWidth + 1;
-			return { ...f, lines: nl, cursor: { ...f.cursor, x: newX }, scrollX: newScrollX, isDirty: true };
+			let nf = f.selection ? removeSelection(f) : { ...f };
+			const l = nf.lines[nf.cursor.y], nl = [...nf.lines]; nl[nf.cursor.y] = l.slice(0, nf.cursor.x) + input + l.slice(nf.cursor.x);
+			const newX = nf.cursor.x + input.length;
+			let newScrollX = nf.scrollX;
+			const visualX = getVisualX(nl[nf.cursor.y], newX);
+			if (visualX >= nf.scrollX + availableWidth) newScrollX = visualX - availableWidth + 1;
+			return { ...nf, lines: nl, cursor: { ...nf.cursor, x: newX }, scrollX: newScrollX, isDirty: true };
 		});
 	}, [updateActiveFile, availableWidth, getVisualX]);
 
 	const handleEnter = useCallback(() => {
 		updateActiveFile(f => {
-			const cl = f.lines[f.cursor.y], ind = cl.match(/^\s*/)?.[0] || '', before = cl.slice(0, f.cursor.x), after = cl.slice(f.cursor.x);
-			const nl = [...f.lines]; nl[f.cursor.y] = before; nl.splice(f.cursor.y + 1, 0, ind + after);
+			let nf = f.selection ? removeSelection(f) : { ...f };
+			const cl = nf.lines[nf.cursor.y], ind = cl.match(/^\s*/)?.[0] || '', before = cl.slice(0, nf.cursor.x), after = cl.slice(nf.cursor.x);
+			const nl = [...nf.lines]; nl[nf.cursor.y] = before; nl.splice(nf.cursor.y + 1, 0, ind + after);
 			const newX = ind.length;
 			const visualX = getVisualX(ind, newX);
-			return { ...f, lines: nl, cursor: { y: f.cursor.y + 1, x: newX }, scrollX: visualX < availableWidth ? 0 : visualX - availableWidth + 1, isDirty: true };
+			return { ...nf, lines: nl, cursor: { y: nf.cursor.y + 1, x: newX }, scrollX: visualX < availableWidth ? 0 : visualX - availableWidth + 1, isDirty: true };
 		});
 	}, [updateActiveFile, availableWidth, getVisualX]);
 
@@ -184,14 +203,15 @@ export const useEditor = (
 		if (text) {
 			const pl = text.split(/\r?\n/);
 			updateActiveFile(f => {
-				const nl = [...f.lines], before = f.lines[f.cursor.y].slice(0, f.cursor.x), after = f.lines[f.cursor.y].slice(f.cursor.x);
+				let nf = f.selection ? removeSelection(f) : { ...f };
+				const nl = [...nf.lines], before = nf.lines[nf.cursor.y].slice(0, nf.cursor.x), after = nf.lines[nf.cursor.y].slice(nf.cursor.x);
 				if (pl.length === 1) {
-					nl[f.cursor.y] = before + pl[0] + after;
-					return { ...f, lines: nl, cursor: { y: f.cursor.y, x: f.cursor.x + pl[0].length }, isDirty: true };
+					nl[nf.cursor.y] = before + pl[0] + after;
+					return { ...nf, lines: nl, cursor: { y: nf.cursor.y, x: nf.cursor.x + pl[0].length }, isDirty: true };
 				} else {
-					nl[f.cursor.y] = before + pl[0];
-					nl.splice(f.cursor.y + 1, 0, ...pl.slice(1, -1), pl[pl.length - 1] + after);
-					return { ...f, lines: nl, cursor: { y: f.cursor.y + pl.length - 1, x: pl[pl.length - 1].length }, isDirty: true };
+					nl[nf.cursor.y] = before + pl[0];
+					nl.splice(nf.cursor.y + 1, 0, ...pl.slice(1, -1), pl[pl.length - 1] + after);
+					return { ...nf, lines: nl, cursor: { y: nf.cursor.y + pl.length - 1, x: pl[pl.length - 1].length }, isDirty: true };
 				}
 			});
 		}
