@@ -6,6 +6,7 @@ interface FooterProps {
 	activeFile: FileState | null;
 	gotoLineInput: string | null;
 	searchInput?: string | null;
+	searchCursorIndex?: number;
 	searchResultsCount?: number;
 	searchIndex?: number;
 	showGitGutter?: boolean;
@@ -16,6 +17,7 @@ const Footer: React.FC<FooterProps> = ({
 	activeFile,
 	gotoLineInput,
 	searchInput,
+	searchCursorIndex,
 	searchResultsCount = 0,
 	searchIndex = 0,
 	showGitGutter = false,
@@ -32,7 +34,15 @@ const Footer: React.FC<FooterProps> = ({
 	return (
 		<Box paddingX={1} flexShrink={0} height={1}>
 			{searchInput !== undefined && searchInput !== null ? (
-				<Text backgroundColor="blue" color="white"> Search: {searchInput}_ ({searchResultsCount > 0 ? `${searchIndex + 1}/${searchResultsCount}` : '0/0'}) </Text>
+				<Text backgroundColor="blue" color="white">
+					{' Search: '}
+					{searchInput.slice(0, searchCursorIndex ?? searchInput.length)}
+					<Text backgroundColor="white" color="blue">
+						{(searchCursorIndex ?? searchInput.length) < searchInput.length ? searchInput[searchCursorIndex ?? searchInput.length] : '_'}
+					</Text>
+					{searchInput.slice((searchCursorIndex ?? searchInput.length) + 1)}
+					{` (${searchResultsCount > 0 ? `${searchIndex + 1}/${searchResultsCount}` : '0/0'}) `}
+				</Text>
 			) : gotoLineInput !== null ? (
 				<Text backgroundColor="blue" color="white"> Go to line: {gotoLineInput}_ </Text>
 			) : (

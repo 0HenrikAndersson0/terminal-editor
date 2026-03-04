@@ -27,6 +27,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	const [searchInput, setSearchInput] = useState<string | null>(null);
 	const [searchResults, setSearchResults] = useState<{ x: number; y: number }[]>([]);
 	const [searchIndex, setSearchIndex] = useState(0);
+	const [searchCursorIndex, setSearchCursorIndex] = useState(0);
 
 	const { loadDirectory, getLangFromPath, readFile, writeFile } = useFileSystem();
 	const { updateGitChanges } = useGit(setFiles);
@@ -114,11 +115,22 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	useInput((input, key) => {
 		if (key.ctrl && input === 'd') { setShowGitGutter(p => !p); if (!showGitGutter) updateGitChanges(activeFileIndex); return; }
 		if (key.ctrl && input === 'e') { setShowExplorer(p => !p); return; }
-		if (key.ctrl && input === 'f') { setSearchInput(p => p === null ? '' : null); return; }
+		if (key.ctrl && input === 'f') {
+			setSearchInput(p => {
+				if (p === null) {
+					setSearchCursorIndex(0);
+					return '';
+				}
+				return null;
+			});
+			return;
+		}
 		if (key.ctrl && input === 'g') { setGotoLineInput(p => p === null ? '' : null); return; }
 
 		if (searchInput !== null) {
 			if (key.escape) setSearchInput(null);
+			else if (key.leftArrow) setSearchCursorIndex(p => Math.max(0, p - 1));
+			else if (key.rightArrow) setSearchCursorIndex(p => Math.min(searchInput.length, p + 1));
 			else if (key.tab || key.return) {
 				if (searchResults.length > 0) {
 					const step = key.shift ? -1 : 1;
@@ -143,11 +155,31 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 						return { ...f, cursor: { y: match.y, x: match.x }, scrollX: newScrollX, scroll: newScroll };
 					});
 				}
-			} else if (key.backspace || input === '\x7f' || input === '\b') {
-				setSearchInput(p => p!.slice(0, -1));
+			} else if (key.backspace || key.delete || input === '\x7f' || input === '\b') {
+				const isForwardDelete = key.delete;
+				if (isForwardDelete) {
+					setSearchInput(p => {
+						if (searchCursorIndex < p!.length) {
+							return p!.slice(0, searchCursorIndex) + p!.slice(searchCursorIndex + 1);
+						}
+						return p;
+					});
+				} else {
+					setSearchInput(p => {
+						if (searchCursorIndex > 0) {
+							setSearchCursorIndex(prev => prev - 1);
+							return p!.slice(0, searchCursorIndex - 1) + p!.slice(searchCursorIndex);
+						}
+						return p;
+					});
+				}
 				setSearchIndex(0);
-			} else if (input && !key.ctrl && !key.meta && !['\r', '\n', '\t'].includes(input)) {
-				setSearchInput(p => p + input);
+			} else if (input && !key.ctrl && !key.meta && !['\r', '\n', '\t'].includes(input) && !key.upArrow && !key.downArrow && !key.leftArrow && !key.rightArrow) {
+				setSearchInput(p => {
+					const next = p!.slice(0, searchCursorIndex) + input + p!.slice(searchCursorIndex);
+					setSearchCursorIndex(prev => prev + input.length);
+					return next;
+				});
 				setSearchIndex(0);
 			}
 			return;
@@ -239,7 +271,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 				<Box flexDirection="column" flexGrow={1}>
 					<TabBar files={files} activeFileIndex={activeFileIndex} />
 					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} availableWidth={availableWidth} showGitGutter={showGitGutter} showExplorer={showExplorer} searchInput={searchInput} searchResults={searchResults} searchIndex={searchIndex} />
-					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} searchInput={searchInput} searchResultsCount={searchResults.length} searchIndex={searchIndex} showGitGutter={showGitGutter} showExplorer={showExplorer} />
+					<Footer activeFile={activeFile} gotoLineInput={gotoLineInput} searchInput={searchInput} searchCursorIndex={searchCursorIndex} searchResultsCount={searchResults.length} searchIndex={searchIndex} showGitGutter={showGitGutter} showExplorer={showExplorer} />
 				</Box>
 			</Box>
 		</Box>
