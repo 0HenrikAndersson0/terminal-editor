@@ -1,6 +1,6 @@
 {
   "name": "edru",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A modern terminal text editor with Ink and Shiki",
   "bin": {
     "edru": "dist/index.js"
