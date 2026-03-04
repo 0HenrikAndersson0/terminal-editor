@@ -6,9 +6,10 @@ interface ExplorerProps {
 	nodes: FileNode[];
 	selectionIndex: number;
 	terminalHeight: number;
+	width: number;
 }
 
-const Explorer: React.FC<ExplorerProps> = ({ nodes, selectionIndex, terminalHeight }) => {
+const Explorer: React.FC<ExplorerProps> = ({ nodes, selectionIndex, terminalHeight, width }) => {
 	const [scrollOffset, setScrollOffset] = useState(0);
 	const visibleCount = Math.max(1, terminalHeight - 5);
 
@@ -28,7 +29,7 @@ const Explorer: React.FC<ExplorerProps> = ({ nodes, selectionIndex, terminalHeig
 	const visibleNodes = nodes.slice(scrollOffset, scrollOffset + visibleCount);
 
 	return (
-		<Box width={30} flexDirection="column" borderStyle="single" borderColor="gray" flexShrink={0}>
+		<Box width={width} flexDirection="column" borderStyle="single" borderColor="gray" flexShrink={0}>
 			{visibleNodes.map((node, i) => {
 				const absoluteIndex = scrollOffset + i;
 				return (

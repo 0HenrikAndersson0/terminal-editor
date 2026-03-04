@@ -68,7 +68,17 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	const terminalHeight = stdout?.rows ?? 24;
 	const terminalWidth = stdout?.columns ?? 80;
 	const viewHeight = Math.max(1, terminalHeight - 6);
-	const explorerWidth = showExplorer ? 30 : 0;
+
+	let calculatedExplorerWidth = 30;
+	if (showExplorer) {
+		const maxNodeWidth = explorerNodes.reduce((max, node) => {
+			const nodeWidth = (node.level * 2) + (node.isDirectory ? 2 : 2) + node.name.length + 4; // paddingX + borders
+			return Math.max(max, nodeWidth);
+		}, 30);
+		calculatedExplorerWidth = Math.min(maxNodeWidth, Math.floor(terminalWidth * 0.5));
+	}
+	const explorerWidth = showExplorer ? calculatedExplorerWidth : 0;
+
 	const lineNumWidth = 6;
 	const paddingWidth = 2;
 	const availableWidth = Math.max(1, terminalWidth - explorerWidth - lineNumWidth - paddingWidth);
@@ -225,7 +235,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 		<Box flexDirection="column" height={terminalHeight}>
 			<Header activeFile={activeFile} />
 			<Box flexGrow={1} flexDirection="row">
-				{showExplorer && <Explorer nodes={explorerNodes} selectionIndex={explorerSelectionIndex} terminalHeight={terminalHeight - 3} />}
+				{showExplorer && <Explorer nodes={explorerNodes} selectionIndex={explorerSelectionIndex} terminalHeight={terminalHeight - 3} width={explorerWidth} />}
 				<Box flexDirection="column" flexGrow={1}>
 					<TabBar files={files} activeFileIndex={activeFileIndex} />
 					<Editor activeFile={activeFile} highlighter={highlighter} viewHeight={viewHeight} availableWidth={availableWidth} showGitGutter={showGitGutter} showExplorer={showExplorer} searchInput={searchInput} searchResults={searchResults} searchIndex={searchIndex} />
