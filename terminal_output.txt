@@ -1,0 +1,28 @@
+
+ Initializing highlighter...
+
+[2K[1A[2K[1A[2K[1A[2K[G
+  ERROR Raw mode is not supported on the current process.stdin, which Ink uses
+       as input stream by default.
+       Read about how to prevent this error on
+       https://github.com/vadimdemedes/ink/#israwmodesupported
+
+ - Read about how to prevent this error on
+   https://github.com/vadimdemedes/ink/#israwmodesupported
+ - handleSetRawMode (node_modules/ink/build/components/App.js:108:23)
+ -  (node_modules/ink/build/hooks/use-input.js:36:9)
+ -commitHookEffectLis (node_modules/react-reconciler/cjs/react-reconciler.devel
+  Mount              opment.js:14817:26)
+ -commitPassiveMountO (node_modules/react-reconciler/cjs/react-reconciler.devel
+  Fiber              opment.js:16648:11)
+ -commitPassiveMountEffect (node_modules/react-reconciler/cjs/react-reconciler.
+  _complete               development.js:16608:9)
+ -commitPassiveMountEffe (node_modules/react-reconciler/cjs/react-reconciler.de
+  ts_begin              velopment.js:16595:7)
+ -commitPassiveMountE (node_modules/react-reconciler/cjs/react-reconciler.devel
+  fects              opment.js:16583:3)
+ -flushPassiveEffect (node_modules/react-reconciler/cjs/react-reconciler.develo
+  Impl              pment.js:19221:3)
+ -flushPassiveEff (node_modules/react-reconciler/cjs/react-reconciler.developme
+  cts            nt.js:19166:14)
+ -  (node_modules/react-reconciler/cjs/react-reconciler.development.js:18951:9)
