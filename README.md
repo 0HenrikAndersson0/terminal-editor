@@ -7,19 +7,17 @@ A modern terminal text editor built with Ink and Shiki.
 
 ## Features
 
-- **Syntax Highlighting:** Powered by Shiki with VS Code-grade accuracy.
+- **High Performance:** Optimized for large files (10,000+ lines) with virtualization and debounced undo/search.
+- **Syntax Highlighting:** Powered by Shiki with VS Code-grade accuracy and a token cache for smooth editing.
+- **Search & Replace:** Press `Ctrl+F` to search and `Ctrl+R` to replace. Support for "Replace All" with `Ctrl+Enter`.
+- **Integrated Help:** Press `Ctrl+L` anytime to see a full-width modal of all available shortcuts.
+- **Git Integration:** Git Branch display in the status bar and Toggle Git Gutter (`Ctrl+D`).
 - **Project Explorer:** Toggle a sidebar with `Ctrl+E` to navigate folder structures and open files.
-- **Search & Highlight:** Press `Ctrl+F` to search for text within the current file. Use `Tab` or `Enter` to cycle through results.
-- **Git Gutter:** Toggle with `Ctrl+D` to see added/modified lines (green) and deletions (red markers).
-- **Horizontal Scrolling:** Seamlessly navigate long lines of code.
 - **Auto-Indentation:** Automatically matches the indentation of the previous line when pressing Enter.
-- **Current Line Highlighting:** Visually identifies the line your cursor is on.
-- **Indentation-Aware Navigation:** Vertical movement snaps to the indentation level of lines.
-- **Fast Navigation:** Support for PageUp and PageDown.
+- **Multi-file Support:** Open multiple files and switch between them with `Ctrl+N`/`Ctrl+P`.
+- **Clipboard & Selection:** Full selection (`Shift+Arrows/Home/End`) and Copy (`Ctrl+K`), Cut (`Ctrl+X`), Paste (`Ctrl+U`).
+- **Undo/Redo:** Reliable `Ctrl+Z` and `Ctrl+Y` support.
 - **Go to Line:** Press `Ctrl+G` to jump to a specific line number.
-- **Multi-file Support:** Open multiple files and switch between them.
-- **Clipboard Support:** Integrated copy (`Ctrl+K`) and paste (`Ctrl+U`).
-- **Layout Stability:** UI remains intact even with long paths or large files.
 
 ## Installation
 
@@ -47,19 +45,25 @@ edru src/App.tsx src/index.tsx
 ## Shortcuts
 
 - `Arrows`: Move cursor
-- `Shift + Arrows`: Select text
+- `Home / End`: Jump to line start / end
+- `Shift + Arrows / Home / End`: Select text
 - `PageUp / PageDown`: Scroll one page
+- `Ctrl + L`: Toggle Help Modal
+- `Ctrl + F`: Search & Highlight
+- `Ctrl + R`: Search & Replace
 - `Ctrl + E`: Toggle Project Explorer (Sidebar)
 - `Ctrl + D`: Toggle Git Gutter (Changes)
-- `Ctrl + F`: Search & Highlight
 - `Ctrl + G`: Go to line
 - `Ctrl + N`: Next file tab
 - `Ctrl + P`: Previous file tab
 - `Ctrl + K`: Copy selection
+- `Ctrl + X`: Cut selection
 - `Ctrl + U`: Paste
+- `Ctrl + Z`: Undo
+- `Ctrl + Y`: Redo
 - `Ctrl + S`: Save file
-- `Ctrl + B`: Swap Backspace/Delete behavior
-- `Ctrl + Q` or `Esc`: Quit
+- `Ctrl + Q`: Quit
+- `Esc`: Cancel search/replace/help/explorer
 
 ## Development
 
