@@ -28,4 +28,7 @@ export interface FileState {
 	isDirty: boolean;
 	selection: Selection | null;
 	gitChanges: GitChanges | null;
+	undoStack: { lines: string[]; cursor: { x: number; y: number }; preferredX?: number }[];
+	redoStack: { lines: string[]; cursor: { x: number; y: number }; preferredX?: number }[];
+	preferredX?: number;
 }

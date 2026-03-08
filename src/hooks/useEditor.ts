@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { FileState } from '../types.js';
 import clipboard from 'clipboardy';
 
@@ -31,6 +31,8 @@ export const useEditor = (
 		return visualX;
 	};
 
+	const lastEditTime = useRef<number>(0);
+
 	const moveCursor = useCallback((key: any, shift: boolean) => {
 		if (!activeFile) return;
 
@@ -42,114 +44,112 @@ export const useEditor = (
 			return f.scrollX;
 		};
 
-		if (shift) {
-			updateActiveFile(f => {
-				const start = f.selection ? f.selection.start : { ...f.cursor };
-				const newCursor = { ...f.cursor };
-				let newScrollX = f.scrollX;
+		updateActiveFile(f => {
+			const start = f.selection ? f.selection.start : { ...f.cursor };
+			const newCursor = { ...f.cursor };
+			let newScrollX = f.scrollX;
+			let newPreferredX = f.preferredX ?? f.cursor.x;
 
-				if (key.upArrow) {
-					const newY = Math.max(0, f.cursor.y - 1);
-					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
-					const ti = f.lines[newY].match(/^\s*/)?.[0].length || 0;
-					newCursor.y = newY;
-					newCursor.x = f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length);
-				} else if (key.downArrow) {
-					const newY = Math.min(f.lines.length - 1, f.cursor.y + 1);
-					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
-					const ti = f.lines[newY].match(/^\s*/)?.[0].length || 0;
-					newCursor.y = newY;
-					newCursor.x = f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length);
-				} else if (key.pageUp) {
-					newCursor.y = Math.max(0, f.cursor.y - viewHeight);
-					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
-				} else if (key.pageDown) {
-					newCursor.y = Math.min(f.lines.length - 1, f.cursor.y + viewHeight);
-					newCursor.x = Math.min(f.cursor.x, f.lines[newCursor.y].length);
-				} else if (key.leftArrow) {
-					if (f.cursor.x > 0) newCursor.x = f.cursor.x - 1;
-					else if (f.cursor.y > 0) { newCursor.y = f.cursor.y - 1; newCursor.x = f.lines[newCursor.y].length; }
-				} else if (key.rightArrow) {
-					if (f.cursor.x < f.lines[f.cursor.y].length) newCursor.x = f.cursor.x + 1;
-					else if (f.cursor.y < f.lines.length - 1) { newCursor.y = f.cursor.y + 1; newCursor.x = 0; }
-				}
-				newScrollX = updateXScroll(f, newCursor.x);
-				return { ...f, cursor: newCursor, scrollX: newScrollX, selection: { start, end: newCursor } };
-			});
-		} else {
 			if (key.upArrow) {
-				updateActiveFile(f => {
-					const newY = Math.max(0, f.cursor.y - 1);
-					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
-					const ti = f.lines[newY].match(/^\s*/)?.[0].length || 0;
-					const newX = f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length);
-					return { ...f, cursor: { y: newY, x: newX }, scrollX: updateXScroll(f, newX), selection: null };
-				});
+				newCursor.y = Math.max(0, f.cursor.y - 1);
+				newCursor.x = Math.min(newPreferredX, f.lines[newCursor.y].length);
 			} else if (key.downArrow) {
-				updateActiveFile(f => {
-					const newY = Math.min(f.lines.length - 1, f.cursor.y + 1);
-					const ci = f.lines[f.cursor.y].match(/^\s*/)?.[0].length || 0;
-					const ti = f.lines[newY].match(/^\s*/)?.[0].length || 0;
-					const newX = f.cursor.x === ci ? ti : Math.min(f.cursor.x, f.lines[newY].length);
-					return { ...f, cursor: { y: newY, x: newX }, scrollX: updateXScroll(f, newX), selection: null };
-				});
+				newCursor.y = Math.min(f.lines.length - 1, f.cursor.y + 1);
+				newCursor.x = Math.min(newPreferredX, f.lines[newCursor.y].length);
 			} else if (key.pageUp) {
-				updateActiveFile(f => {
-					const newY = Math.max(0, f.cursor.y - viewHeight);
-					const newX = Math.min(f.cursor.x, f.lines[newY].length);
-					return { ...f, cursor: { y: newY, x: newX }, scroll: Math.max(0, f.scroll - viewHeight), scrollX: updateXScroll(f, newX), selection: null };
-				});
+				newCursor.y = Math.max(0, f.cursor.y - viewHeight);
+				newCursor.x = Math.min(newPreferredX, f.lines[newCursor.y].length);
 			} else if (key.pageDown) {
-				updateActiveFile(f => {
-					const newY = Math.min(f.lines.length - 1, f.cursor.y + viewHeight);
-					const newX = Math.min(f.cursor.x, f.lines[newY].length);
-					return { ...f, cursor: { y: newY, x: newX }, scroll: Math.min(Math.max(0, f.lines.length - viewHeight), f.scroll + viewHeight), scrollX: updateXScroll(f, newX), selection: null };
-				});
+				newCursor.y = Math.min(f.lines.length - 1, f.cursor.y + viewHeight);
+				newCursor.x = Math.min(newPreferredX, f.lines[newCursor.y].length);
 			} else if (key.leftArrow) {
-				updateActiveFile(f => {
-					let newCursor = { ...f.cursor };
-					if (f.cursor.x > 0) newCursor.x = f.cursor.x - 1;
-					else if (f.cursor.y > 0) { newCursor.y = f.cursor.y - 1; newCursor.x = f.lines[newCursor.y].length; }
-					return { ...f, cursor: newCursor, scrollX: updateXScroll(f, newCursor.x), selection: null };
-				});
+				if (f.cursor.x > 0) newCursor.x = f.cursor.x - 1;
+				else if (f.cursor.y > 0) { newCursor.y = f.cursor.y - 1; newCursor.x = f.lines[newCursor.y].length; }
+				newPreferredX = newCursor.x;
 			} else if (key.rightArrow) {
-				updateActiveFile(f => {
-					let newCursor = { ...f.cursor };
-					if (f.cursor.x < f.lines[f.cursor.y].length) newCursor.x = f.cursor.x + 1;
-					else if (f.cursor.y < f.lines.length - 1) { newCursor.y = f.cursor.y + 1; newCursor.x = 0; }
-					return { ...f, cursor: newCursor, scrollX: updateXScroll(f, newCursor.x), selection: null };
-				});
+				if (f.cursor.x < f.lines[f.cursor.y].length) newCursor.x = f.cursor.x + 1;
+				else if (f.cursor.y < f.lines.length - 1) { newCursor.y = f.cursor.y + 1; newCursor.x = 0; }
+				newPreferredX = newCursor.x;
+			} else if (key.home) {
+				newCursor.x = 0;
+				newPreferredX = 0;
+			} else if (key.end) {
+				newCursor.x = f.lines[f.cursor.y].length;
+				newPreferredX = newCursor.x;
 			}
-		}
+			newScrollX = updateXScroll(f, newCursor.x);
+			return { 
+				...f, 
+				cursor: newCursor, 
+				scrollX: newScrollX, 
+				preferredX: newPreferredX,
+				selection: shift ? { start, end: newCursor } : null 
+			};
+		});
 	}, [activeFile, updateActiveFile, viewHeight, availableWidth]);
 
-	const handleTextDelete = useCallback((backspace: boolean, del: boolean) => {
+	const pushToUndo = (f: FileState, merge: boolean = false): FileState => {
+		if (merge && f.undoStack.length > 0) {
+			return { ...f, redoStack: [] };
+		}
+		const newUndoStack = [...f.undoStack, { lines: [...f.lines], cursor: { ...f.cursor }, preferredX: f.preferredX }];
+		if (newUndoStack.length > 50) newUndoStack.shift();
+		return { ...f, undoStack: newUndoStack, redoStack: [] };
+	};
+
+	const undo = useCallback(() => {
 		updateActiveFile(f => {
-			let nf = f.selection ? removeSelection(f) : { ...f };
-			if (f.selection) {
-				// Selection was already removed
-			} else if (backspace) {
+			if (f.undoStack.length === 0) return f;
+			const last = f.undoStack[f.undoStack.length - 1];
+			const newUndoStack = f.undoStack.slice(0, -1);
+			const newRedoStack = [{ lines: [...f.lines], cursor: { ...f.cursor }, preferredX: f.preferredX }, ...f.redoStack];
+			if (newRedoStack.length > 50) newRedoStack.pop();
+			return { ...f, lines: last.lines, cursor: last.cursor, preferredX: last.preferredX, undoStack: newUndoStack, redoStack: newRedoStack, selection: null, isDirty: true };
+		});
+	}, [updateActiveFile]);
+
+	const redo = useCallback(() => {
+		updateActiveFile(f => {
+			if (f.redoStack.length === 0) return f;
+			const next = f.redoStack[0];
+			const newRedoStack = f.redoStack.slice(1);
+			const newUndoStack = [...f.undoStack, { lines: [...f.lines], cursor: { ...f.cursor }, preferredX: f.preferredX }];
+			if (newUndoStack.length > 50) newUndoStack.shift();
+			return { ...f, lines: next.lines, cursor: next.cursor, preferredX: next.preferredX, undoStack: newUndoStack, redoStack: newRedoStack, selection: null, isDirty: true };
+		});
+	}, [updateActiveFile]);
+
+	const handleTextDelete = useCallback((backspace: boolean, del: boolean) => {
+		const now = Date.now();
+		const merge = now - lastEditTime.current < 500;
+		lastEditTime.current = now;
+
+		updateActiveFile(f => {
+			let nf = pushToUndo(f, merge);
+			if (f.selection) nf = removeSelection(nf);
+			else if (backspace) {
 				if (f.cursor.x > 0) {
 					const l = f.lines[f.cursor.y];
-					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x - 1) + l.slice(f.cursor.x);
+					nf.lines = [...nf.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x - 1) + l.slice(f.cursor.x);
 					nf.cursor = { ...f.cursor, x: f.cursor.x - 1 };
 					nf.isDirty = true;
 				} else if (f.cursor.y > 0) {
 					const pl = f.lines[f.cursor.y - 1];
-					nf.lines = [...f.lines]; nf.lines[f.cursor.y - 1] = pl + f.lines[f.cursor.y]; nf.lines.splice(f.cursor.y, 1);
+					nf.lines = [...nf.lines]; nf.lines[f.cursor.y - 1] = pl + f.lines[f.cursor.y]; nf.lines.splice(f.cursor.y, 1);
 					nf.cursor = { y: f.cursor.y - 1, x: pl.length };
 					nf.isDirty = true;
 				}
 			} else if (del) {
 				const l = f.lines[f.cursor.y];
 				if (f.cursor.x < l.length) {
-					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x) + l.slice(f.cursor.x + 1);
+					nf.lines = [...nf.lines]; nf.lines[f.cursor.y] = l.slice(0, f.cursor.x) + l.slice(f.cursor.x + 1);
 					nf.isDirty = true;
 				} else if (f.cursor.y < f.lines.length - 1) {
-					nf.lines = [...f.lines]; nf.lines[f.cursor.y] = l + f.lines[f.cursor.y + 1]; nf.lines.splice(f.cursor.y + 1, 1);
+					nf.lines = [...nf.lines]; nf.lines[f.cursor.y] = l + f.lines[f.cursor.y + 1]; nf.lines.splice(f.cursor.y + 1, 1);
 					nf.isDirty = true;
 				}
 			}
+			nf.preferredX = nf.cursor.x;
 			// Update scrollX after delete
 			const line = nf.lines[nf.cursor.y] || '';
 			const visualX = getVisualX(line, nf.cursor.x);
@@ -160,25 +160,32 @@ export const useEditor = (
 	}, [updateActiveFile, availableWidth, getVisualX]);
 
 	const handleTextInput = useCallback((input: string) => {
+		const now = Date.now();
+		const merge = now - lastEditTime.current < 500;
+		lastEditTime.current = now;
+
 		updateActiveFile(f => {
-			let nf = f.selection ? removeSelection(f) : { ...f };
+			let nf = pushToUndo(f, merge);
+			if (f.selection) nf = removeSelection(nf);
 			const l = nf.lines[nf.cursor.y], nl = [...nf.lines]; nl[nf.cursor.y] = l.slice(0, nf.cursor.x) + input + l.slice(nf.cursor.x);
 			const newX = nf.cursor.x + input.length;
 			let newScrollX = nf.scrollX;
 			const visualX = getVisualX(nl[nf.cursor.y], newX);
 			if (visualX >= nf.scrollX + availableWidth) newScrollX = visualX - availableWidth + 1;
-			return { ...nf, lines: nl, cursor: { ...nf.cursor, x: newX }, scrollX: newScrollX, isDirty: true };
+			return { ...nf, lines: nl, cursor: { ...nf.cursor, x: newX }, preferredX: newX, scrollX: newScrollX, isDirty: true };
 		});
 	}, [updateActiveFile, availableWidth, getVisualX]);
 
 	const handleEnter = useCallback(() => {
+		lastEditTime.current = 0; // Force new undo state on Enter
 		updateActiveFile(f => {
-			let nf = f.selection ? removeSelection(f) : { ...f };
+			let nf = pushToUndo(f);
+			if (f.selection) nf = removeSelection(nf);
 			const cl = nf.lines[nf.cursor.y], ind = cl.match(/^\s*/)?.[0] || '', before = cl.slice(0, nf.cursor.x), after = cl.slice(nf.cursor.x);
 			const nl = [...nf.lines]; nl[nf.cursor.y] = before; nl.splice(nf.cursor.y + 1, 0, ind + after);
 			const newX = ind.length;
 			const visualX = getVisualX(ind, newX);
-			return { ...nf, lines: nl, cursor: { y: nf.cursor.y + 1, x: newX }, scrollX: visualX < availableWidth ? 0 : visualX - availableWidth + 1, isDirty: true };
+			return { ...nf, lines: nl, cursor: { y: nf.cursor.y + 1, x: newX }, preferredX: newX, scrollX: visualX < availableWidth ? 0 : visualX - availableWidth + 1, isDirty: true };
 		});
 	}, [updateActiveFile, availableWidth, getVisualX]);
 
@@ -203,7 +210,8 @@ export const useEditor = (
 		if (text) {
 			const pl = text.split(/\r?\n/);
 			updateActiveFile(f => {
-				let nf = f.selection ? removeSelection(f) : { ...f };
+				let nf = pushToUndo(f);
+				if (f.selection) nf = removeSelection(nf);
 				const nl = [...nf.lines], before = nf.lines[nf.cursor.y].slice(0, nf.cursor.x), after = nf.lines[nf.cursor.y].slice(nf.cursor.x);
 				if (pl.length === 1) {
 					nl[nf.cursor.y] = before + pl[0] + after;
@@ -217,5 +225,39 @@ export const useEditor = (
 		}
 	}, [updateActiveFile]);
 
-	return { moveCursor, handleTextDelete, handleTextInput, handleEnter, copyToClipboard, pasteFromClipboard };
+	const cutToClipboard = useCallback(() => {
+		if (activeFile?.selection) {
+			copyToClipboard();
+			updateActiveFile(f => {
+				const nf = pushToUndo(f);
+				return removeSelection(nf);
+			});
+		}
+	}, [activeFile, copyToClipboard, updateActiveFile]);
+
+	const replaceText = useCallback((y: number, x: number, oldLength: number, newText: string) => {
+		updateActiveFile(f => {
+			const nf = pushToUndo(f);
+			const nl = [...nf.lines];
+			const line = nl[y];
+			nl[y] = line.slice(0, x) + newText + line.slice(x + oldLength);
+			return { ...nf, lines: nl, isDirty: true, cursor: { y, x: x + newText.length } };
+		});
+	}, [updateActiveFile]);
+
+	const replaceAllText = useCallback((matches: { x: number; y: number }[], oldLength: number, newText: string) => {
+		updateActiveFile(f => {
+			const nf = pushToUndo(f);
+			const nl = [...nf.lines];
+			// Sort matches from bottom-to-top, right-to-left to avoid offset issues
+			const sortedMatches = [...matches].sort((a, b) => b.y - a.y || b.x - a.x);
+			sortedMatches.forEach(m => {
+				const line = nl[m.y];
+				nl[m.y] = line.slice(0, m.x) + newText + line.slice(m.x + oldLength);
+			});
+			return { ...nf, lines: nl, isDirty: true };
+		});
+	}, [updateActiveFile]);
+
+	return { moveCursor, handleTextDelete, handleTextInput, handleEnter, copyToClipboard, pasteFromClipboard, cutToClipboard, undo, redo, replaceText, replaceAllText };
 };

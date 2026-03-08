@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Box, Text, useStdout } from 'ink';
 import { Highlighter } from 'shiki';
 import { FileState, Selection } from '../types.js';
@@ -16,6 +16,8 @@ interface EditorProps {
 }
 
 const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, availableWidth, showGitGutter, showExplorer, searchInput, searchResults = [], searchIndex = 0 }) => {
+	const highlightCache = useRef<Map<string, { tokens: any[]; rawXMapping: number[] }>>(new Map());
+
 	if (!activeFile) {
 		return (
 			<Box flexGrow={1} alignItems="center" justifyContent="center">
@@ -43,6 +45,34 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 		// Replace tabs with spaces for consistent width
 		const processedLine = line.replace(/\t/g, '    ');
 
+		const cacheKey = `${activeFile.lang}:${processedLine}`;
+		let cached = highlightCache.current.get(cacheKey);
+
+		if (!cached) {
+			const tokens = highlighter && activeFile.lang !== 'text'
+				? highlighter.codeToTokens(processedLine, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
+				: [{ content: processedLine || ' ', color: undefined }];
+
+			const rawXMapping: number[] = [];
+			for (let i = 0; i < line.length; i++) {
+				if (line[i] === '\t') {
+					for (let j = 0; j < 4; j++) rawXMapping.push(i);
+				} else {
+					rawXMapping.push(i);
+				}
+			}
+			cached = { tokens, rawXMapping };
+			highlightCache.current.set(cacheKey, cached);
+			
+			// Simple cache eviction to prevent memory leak
+			if (highlightCache.current.size > 2000) {
+				const firstKey = highlightCache.current.keys().next().value;
+				if (firstKey !== undefined) highlightCache.current.delete(firstKey);
+			}
+		}
+
+		const { tokens, rawXMapping } = cached;
+
 		let realSelection: Selection | null = null;
 		if (selection) {
 			const { start, end } = selection;
@@ -50,23 +80,10 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 			realSelection = isBackward ? { start: end, end: start } : selection;
 		}
 
-		const tokens = highlighter && activeFile.lang !== 'text'
-			? highlighter.codeToTokens(processedLine, { lang: activeFile.lang as any, theme: 'github-dark' }).tokens[0]
-			: [{ content: processedLine || ' ', color: undefined }];
-
-		const rawXMapping: number[] = [];
-		for (let i = 0; i < line.length; i++) {
-			if (line[i] === '\t') {
-				for (let j = 0; j < 4; j++) rawXMapping.push(i);
-			} else {
-				rawXMapping.push(i);
-			}
-		}
-
 		const lineChars: { char: string; color?: string; rawX: number }[] = [];
 		let visualIdx = 0;
 		tokens.forEach(t => {
-			t.content.split('').forEach(char => {
+			t.content.split('').forEach((char: string) => {
 				lineChars.push({ char, color: t.color, rawX: rawXMapping[visualIdx] ?? visualIdx });
 				visualIdx++;
 			});
