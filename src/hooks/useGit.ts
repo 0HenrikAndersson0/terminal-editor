@@ -7,6 +7,15 @@ import { FileState } from '../types.js';
 const execAsync = promisify(exec);
 
 export const useGit = (setFiles: React.Dispatch<React.SetStateAction<FileState[]>>) => {
+	const getBranchName = useCallback(async () => {
+		try {
+			const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD');
+			return stdout.trim();
+		} catch (err) {
+			return null;
+		}
+	}, []);
+
 	const updateGitChanges = useCallback(async (fileIndex: number) => {
 		setFiles(prev => {
 			if (prev.length === 0 || !prev[fileIndex]) return prev;
@@ -49,5 +58,5 @@ export const useGit = (setFiles: React.Dispatch<React.SetStateAction<FileState[]
 		});
 	}, [setFiles]);
 
-	return { updateGitChanges };
+	return { updateGitChanges, getBranchName };
 };
