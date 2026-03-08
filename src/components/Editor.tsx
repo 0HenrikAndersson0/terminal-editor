@@ -75,6 +75,7 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 		if (lineChars.length === 0) lineChars.push({ char: ' ', rawX: 0 });
 
 		const visibleChars = lineChars.slice(activeFile.scrollX, activeFile.scrollX + availableWidth);
+		const willShowCursorAtEnd = isCursorLine && activeCursorX >= (activeFile.scrollX + visibleChars.length) && activeCursorX < (activeFile.scrollX + availableWidth);
 
 		let lineNumberColor = isCursorLine ? 'white' : 'gray';
 		if (isAddedLine) {
@@ -89,8 +90,8 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 					)}
 					<Text color={lineNumberColor} backgroundColor={lineBgColor} wrap="truncate">{String(lineIndex + 1).padStart(3)} │ </Text>
 				</Box>
-				<Box flexGrow={1} flexShrink={0}>
-					<Text backgroundColor={lineBgColor} wrap="truncate">
+				<Box flexGrow={1} flexShrink={0} overflow="hidden">
+					<Box flexDirection="row">
 						{visibleChars.map((item, i) => {
 							const x = i + activeFile.scrollX;
 							let isSelected = false;
@@ -141,10 +142,10 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 								</Text>
 							);
 						})}
-						{isCursorLine && activeCursorX >= (activeFile.scrollX + visibleChars.length) && activeCursorX < (activeFile.scrollX + availableWidth) && (
+						{willShowCursorAtEnd && (
 							<Text backgroundColor="white" color="black"> </Text>
 						)}
-					</Text>
+					</Box>
 				</Box>
 			</Box>
 		);
