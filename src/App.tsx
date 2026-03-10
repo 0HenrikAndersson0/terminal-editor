@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useInput, useStdout } from 'ink';
+import { Box, Text, useInput, useStdout, useStdin } from 'ink';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHighlighter } from 'shiki';
@@ -80,6 +80,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	}, [activeFileIndex]);
 
 	const { stdout } = useStdout();
+	const { stdin, isRawModeSupported } = useStdin();
 	const terminalHeight = stdout?.rows ?? 24;
 	const terminalWidth = stdout?.columns ?? 80;
 	const viewHeight = Math.max(1, terminalHeight - 6);
@@ -99,6 +100,27 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 	const availableWidth = Math.max(1, terminalWidth - explorerWidth - lineNumWidth - paddingWidth);
 
 	const { moveCursor, handleTextDelete, handleTextInput, handleEnter, copyToClipboard, pasteFromClipboard, cutToClipboard, undo, redo, replaceText, replaceAllText } = useEditor(activeFile, updateActiveFile, viewHeight, availableWidth);
+
+	useEffect(() => {
+		if (!isRawModeSupported || !stdin) return;
+		const handleData = (data: Buffer) => {
+			const seq = data.toString('utf8');
+			// Common Home sequences
+			if (seq === '\x1b[H' || seq === '\x1b[1~' || seq === '\x1b[7~' || seq === '\x1bOH') {
+				moveCursor({ home: true }, false);
+			} else if (seq === '\x1b[1;2H') {
+				moveCursor({ home: true }, true);
+			}
+			// Common End sequences
+			else if (seq === '\x1b[F' || seq === '\x1b[4~' || seq === '\x1b[8~' || seq === '\x1bOF') {
+				moveCursor({ end: true }, false);
+			} else if (seq === '\x1b[1;2F') {
+				moveCursor({ end: true }, true);
+			}
+		};
+		stdin.on('data', handleData);
+		return () => { stdin.off('data', handleData); };
+	}, [stdin, isRawModeSupported, moveCursor]);
 
 	useEffect(() => {
 		(async () => {
