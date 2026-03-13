@@ -12,10 +12,10 @@ A modern terminal text editor built with Ink and Shiki.
 - **Search & Replace:** Press `Ctrl+F` to search and `Ctrl+R` to replace. Support for "Replace All" with `Ctrl+Enter`.
 - **Integrated Help:** Press `Ctrl+L` anytime to see a full-width modal of all available shortcuts.
 - **Git Integration:** Git Branch display in the status bar and Toggle Git Gutter (`Ctrl+D`).
-- **Project Explorer:** Toggle a sidebar with `Ctrl+E` to navigate folder structures and open files.
+- **Project Explorer:** Toggle a sidebar with `Ctrl+T` to navigate folder structures and open files.
 - **Auto-Indentation:** Automatically matches the indentation of the previous line when pressing Enter.
 - **Multi-file Support:** Open multiple files and switch between them with `Ctrl+N`/`Ctrl+P`.
-- **Clipboard & Selection:** Full selection (`Shift+Arrows/Home/End`) and Copy (`Ctrl+K`), Cut (`Ctrl+X`), Paste (`Ctrl+U`).
+- **Clipboard & Selection:** Full selection (`Shift+Arrows/Home/End/Ctrl+A/Ctrl+E`) and Copy (`Ctrl+K`), Cut (`Ctrl+X`), Paste (`Ctrl+U`).
 - **Undo/Redo:** Reliable `Ctrl+Z` and `Ctrl+Y` support.
 - **Go to Line:** Press `Ctrl+G` to jump to a specific line number.
 
@@ -45,13 +45,13 @@ edru src/App.tsx src/index.tsx
 ## Shortcuts
 
 - `Arrows`: Move cursor
-- `Home / End`: Jump to line start / end
-- `Shift + Arrows / Home / End`: Select text
+- `Home / End, Ctrl + A / Ctrl + E`: Jump to line start / end
+- `Shift + Arrows / Home / End / Ctrl + A / Ctrl + E`: Select text
 - `PageUp / PageDown`: Scroll one page
 - `Ctrl + L`: Toggle Help Modal
 - `Ctrl + F`: Search & Highlight
 - `Ctrl + R`: Search & Replace
-- `Ctrl + E`: Toggle Project Explorer (Sidebar)
+- `Ctrl + T`: Toggle Project Explorer (Sidebar)
 - `Ctrl + D`: Toggle Git Gutter (Changes)
 - `Ctrl + G`: Go to line
 - `Ctrl + N`: Next file tab
