@@ -152,7 +152,7 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 
 	useInput((input, key) => {
 		if (key.ctrl && input === 'd') { setShowGitGutter(p => !p); if (!showGitGutter) updateGitChanges(activeFileIndex); return; }
-		if (key.ctrl && input === 'e') { setShowExplorer(p => !p); return; }
+		if (key.ctrl && input === 't') { setShowExplorer(p => !p); return; }
 		if (key.ctrl && input === 'f') {
 			setSearchInput(p => {
 				if (p === null) {
@@ -353,6 +353,8 @@ const App: React.FC<{ filePaths: string[] }> = ({ filePaths }) => {
 		if (!activeFile || activeFile.loading || activeFile.error) return;
 
 		if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow || key.pageUp || key.pageDown || (key as any).home || (key as any).end) { moveCursor(key, key.shift); return; }
+		if (key.ctrl && input === 'a') { moveCursor({ home: true }, key.shift); return; }
+		if (key.ctrl && input === 'e') { moveCursor({ end: true }, key.shift); return; }
 		if (key.ctrl && input === 'k') { copyToClipboard(); return; }
 		if (key.ctrl && input === 'x') { cutToClipboard(); return; }
 		if (key.ctrl && input === 'u') { pasteFromClipboard(); return; }
