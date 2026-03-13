@@ -66,7 +66,7 @@ const Help: React.FC = () => {
 
 				{renderHeader(' Navigation ')}
 				{renderRow('Arrows', 'Move Cursor')}
-				{renderRow('Home / End', 'Line Start / End')}
+				{renderRow('Home/End, ^A/^E', 'Line Start / End')}
 				{renderRow('PgUp / PgDn', 'Scroll Page')}
 				{renderRow('^G', 'Go to Line')}
 				{renderRow('^N / ^P', 'Next / Prev Tab')}
@@ -86,7 +86,7 @@ const Help: React.FC = () => {
 
 				{renderHeader(' Tools ')}
 				{renderRow('^F', 'Find / Search')}
-				{renderRow('^E', 'Toggle Explorer')}
+				{renderRow('^T', 'Toggle Explorer')}
 				{renderRow('^D', 'Toggle Git Diff')}
 
 				{renderSpacer()}
