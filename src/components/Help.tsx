@@ -75,7 +75,7 @@ const Help: React.FC = () => {
 
 				{renderHeader(' Editing ')}
 				{renderRow('Shift+Arrows', 'Select Text')}
-				{renderRow('Shift+Home/End', 'Select to Line Start/End')}
+				{renderRow('Shift+Home/End, ^A/^E', 'Select to Line Start/End')}
 				{renderRow('^K', 'Copy Selection')}
 				{renderRow('^X', 'Cut Selection')}
 				{renderRow('^U', 'Paste Clipboard')}

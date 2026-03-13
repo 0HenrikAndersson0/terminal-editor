@@ -21,7 +21,7 @@ const Editor: React.FC<EditorProps> = ({ activeFile, highlighter, viewHeight, av
 	if (!activeFile) {
 		return (
 			<Box flexGrow={1} alignItems="center" justifyContent="center">
-				<Text color="gray">Press ^E to open explorer</Text>
+				<Text color="gray">Press ^T to open explorer</Text>
 			</Box>
 		);
 	}
